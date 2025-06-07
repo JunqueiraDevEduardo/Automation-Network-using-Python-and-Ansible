@@ -1,0 +1,211 @@
+---
+# Enhanced Network Configuration Playbook
+# Works with Python-generated GNS3 topology
+# File: ansible/configure_network.yml
+
+- name: Configure Network Infrastructure
+  hosts: all
+  gather_facts: no
+  connection: local
+  
+  vars:
+    # Load network configuration from YAML
+    network_config: "{{ lookup('file', '../network_data.yml') | from_yaml }}"
+    
+    # Common configuration
+    domain_name: "company.local"
+    ntp_server: "pool.ntp.org"
+    dns_servers:
+      - "8.8.8.8"
+      - "8.8.4.4"
+    
+    # SNMP Configuration
+    snmp_community: "public"
+    snmp_location: "Main Office"
+    snmp_contact: "network-admin@company.local"
+    
+    # Security settings
+    enable_secret: "enable123"
+    console_password: "console123"
+    vty_password: "vty123"
+
+  tasks:
+    - name: Display network configuration
+      debug:
+        msg: "Configuring {{ network_config.project_name }} network topology"
+      run_once: true
+
+# Configure Core Router
+- name: Configure Core Router
+  hosts: routers
+  gather_facts: no
+  connection: network_cli
+  
+  vars:
+    network_config: "{{ lookup('file', '../network_data.yml') | from_yaml }}"
+    
+  tasks:
+    - name: Configure hostname
+      ios_config:
+        lines:
+          - "hostname {{ inventory_hostname }}"
+      
+    - name: Configure basic settings
+      ios_config:
+        lines:
+          - "service timestamps debug datetime msec"
+          - "service timestamps log datetime msec"
+          - "service password-encryption"
+          - "no service dhcp"
+          - "ip domain-name {{ domain_name }}"
+          - "ip name-server {{ dns_servers | join(' ') }}"
+          - "ntp server {{ ntp_server }}"
+    
+    - name: Configure enable secret
+      ios_config:
+        lines:
+          - "enable secret {{ enable_secret }}"
+    
+    - name: Configure console and VTY access
+      ios_config:
+        lines:
+          - "line console 0"
+          - " password {{ console_password }}"
+          - " login"
+          - " logging synchronous"
+          - "line vty 0 4"
+          - " password {{ vty_password }}"
+          - " login"
+          - " transport input telnet ssh"
+    
+    - name: Enable IP routing
+      ios_config:
+        lines:
+          - "ip routing"
+    
+    - name: Configure VLAN interfaces for inter-VLAN routing
+      ios_config:
+        lines:
+          - "interface vlan {{ item.vlan_id }}"
+          - " description {{ item.name }} VLAN Gateway"  
+          - " ip address {{ item.gateway }} {{ item.network.split('/')[-1] | ipaddr('netmask') }}"
+          - " no shutdown"
+        parents: []
+      loop: "{{ network_config.departments }}"
+      when: network_config.departments is defined
+    
+    - name: Configure trunk interfaces to department switches
+      ios_config:
+        lines:
+          - "interface gigabitethernet0/{{ item.0 + 2 }}"
+          - " description Link to {{ item.1.name }} Department"
+          - " switchport trunk encapsulation dot1q"
+          - " switchport mode trunk"
+          - " switchport trunk allowed vlan {{ item.1.vlan_id }}"
+          - " no shutdown"
+        parents: []
+      loop: "{{ network_config.departments | default([]) | enumerate }}"
+    
+    - name: Configure internet/WAN interface
+      ios_config:
+        lines:
+          - "interface gigabitethernet0/1"
+          - " description Internet Connection"
+          - " ip address dhcp"
+          - " no shutdown"
+    
+    - name: Configure OSPF routing
+      ios_config:
+        lines:
+          - "router ospf 1"
+          - " router-id 1.1.1.1"
+          - " log-adjacency-changes"
+          - " network {{ item.network }} area 0"
+        parents: []
+      loop: "{{ network_config.departments | default([]) }}"
+    
+    - name: Configure SNMP
+      ios_config:
+        lines:
+          - "snmp-server community {{ snmp_community }} RO"
+          - "snmp-server location {{ snmp_location }}"
+          - "snmp-server contact {{ snmp_contact }}"
+    
+    - name: Configure NAT for internet access
+      ios_config:
+        lines:
+          - "ip nat inside source list 1 interface gigabitethernet0/1 overload"
+          - "access-list 1 permit 192.168.0.0 0.0.255.255"
+    
+    - name: Mark VLAN interfaces as NAT inside
+      ios_config:
+        lines:
+          - "interface vlan {{ item.vlan_id }}"
+          - " ip nat inside"
+        parents: []
+      loop: "{{ network_config.departments | default([]) }}"
+    
+    - name: Mark WAN interface as NAT outside
+      ios_config:
+        lines:
+          - "interface gigabitethernet0/1"
+          - " ip nat outside"
+
+# Configure Department Switches
+- name: Configure Department Switches
+  hosts: switches
+  gather_facts: no
+  connection: network_cli
+  
+  vars:
+    network_config: "{{ lookup('file', '../network_data.yml') | from_yaml }}"
+    
+  tasks:
+    - name: Configure hostname
+      ios_config:
+        lines:
+          - "hostname {{ inventory_hostname }}"
+    
+    - name: Configure basic settings
+      ios_config:
+        lines:
+          - "service timestamps debug datetime msec"
+          - "service timestamps log datetime msec"
+          - "service password-encryption"
+          - "ip domain-name {{ domain_name }}"
+    
+    - name: Configure enable secret
+      ios_config:
+        lines:
+          - "enable secret {{ enable_secret }}"
+    
+    - name: Configure console and VTY access
+      ios_config:
+        lines:
+          - "line console 0"
+          - " password {{ console_password }}"
+          - " login"
+          - " logging synchronous"
+          - "line vty 0 4"
+          - " password {{ vty_password }}"
+          - " login"
+          - " transport input telnet ssh"
+    
+    - name: Determine department VLAN from hostname
+      set_fact:
+        dept_vlan: "{{ network_config.departments | selectattr('name', 'in', inventory_hostname) | map(attribute='vlan_id') | first | default(99) }}"
+        dept_name: "{{ network_config.departments | selectattr('name', 'in', inventory_hostname) | map(attribute='name') | first | default('Unknown') }}"
+        device_count: "{{ network_config.departments | selectattr('name', 'in', inventory_hostname) | map(attribute='device_count') | first | default(5) }}"
+    
+    - name: Create department VLAN
+      ios_config:
+        lines:
+          - "vlan {{ dept_vlan }}"
+          - " name {{ dept_name }}_VLAN"
+    
+    - name: Configure access ports for department devices
+      ios_config:
+        lines:
+          - "interface range fastethernet0/1-{{ device_count }}"
+          - " description {{ dept_name }} Department Devices"
+          - " switchport mode access
