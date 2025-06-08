@@ -1,0 +1,10 @@
+enable
+configure terminal
+hostname R-90-I
+interface g0/0
+no shutdown
+interface g0/0.90
+encapsulation dot1Q 90
+ip address 192.168.90.1 255.255.255.248
+no shut
+exit

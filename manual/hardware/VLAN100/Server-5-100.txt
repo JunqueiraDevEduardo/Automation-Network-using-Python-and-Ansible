@@ -1,0 +1,9 @@
+enable
+configure terminal
+hostname Server-5-100
+interface f0/0
+ip address 192.168.0.6 255.255.255.240
+no shutdown
+exit
+ip default-gateway 192.168.0.1
+exit

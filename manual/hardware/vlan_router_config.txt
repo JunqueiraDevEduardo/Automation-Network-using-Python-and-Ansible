@@ -1,0 +1,165 @@
+vlan 10
+ name VLAN_10
+ exit
+interface range fa0/2 - 4
+ switchport mode access
+ switchport access vlan 10
+ exit
+interface fa0/1
+ switchport mode trunk
+ exit
+!
+vlan 20
+ name VLAN_20
+ exit
+interface range fa0/2 - 4
+ switchport mode access
+ switchport access vlan 20
+ exit
+interface fa0/1
+ switchport mode trunk
+ exit
+!
+vlan 30
+ name VLAN_30
+ exit
+interface range fa0/2 - 4
+ switchport mode access
+ switchport access vlan 30
+ exit
+interface fa0/1
+ switchport mode trunk
+ exit
+!
+vlan 40
+ name VLAN_40
+ exit
+interface range fa0/2 - 4
+ switchport mode access
+ switchport access vlan 40
+ exit
+interface fa0/1
+ switchport mode trunk
+ exit
+!
+vlan 50
+ name VLAN_50
+ exit
+interface range fa0/2 - 4
+ switchport mode access
+ switchport access vlan 50
+ exit
+interface fa0/1
+ switchport mode trunk
+ exit
+!
+vlan 60
+ name VLAN_60
+ exit
+interface range fa0/2 - 4
+ switchport mode access
+ switchport access vlan 60
+ exit
+interface fa0/1
+ switchport mode trunk
+ exit
+!
+vlan 70
+ name VLAN_70
+ exit
+interface range fa0/2 - 4
+ switchport mode access
+ switchport access vlan 70
+ exit
+interface fa0/1
+ switchport mode trunk
+ exit
+!
+vlan 80
+ name VLAN_80
+ exit
+interface range fa0/2 - 4
+ switchport mode access
+ switchport access vlan 80
+ exit
+interface fa0/1
+ switchport mode trunk
+ exit
+!
+vlan 90
+ name VLAN_90
+ exit
+interface range fa0/2 - 4
+ switchport mode access
+ switchport access vlan 90
+ exit
+interface fa0/1
+ switchport mode trunk
+ exit
+!
+vlan 100
+ name VLAN_100
+ exit
+interface range fa0/2 - 4
+ switchport mode access
+ switchport access vlan 100
+ exit
+interface fa0/1
+ switchport mode trunk
+ exit
+!
+
+-----> Falta fazer estes ainda:
+interface g0/0
+ no shutdown
+ exit
+interface g0/0.10
+ encapsulation dot1Q 10
+ ip address 192.168.10.1 255.255.255.0
+ exit
+!
+interface g0/0.20
+ encapsulation dot1Q 20
+ ip address 192.168.20.1 255.255.255.0
+ exit
+!
+interface g0/0.30
+ encapsulation dot1Q 30
+ ip address 192.168.30.1 255.255.255.0
+ exit
+!
+interface g0/0.40
+ encapsulation dot1Q 40
+ ip address 192.168.40.1 255.255.255.0
+ exit
+!
+interface g0/0.50
+ encapsulation dot1Q 50
+ ip address 192.168.50.1 255.255.255.0
+ exit
+!
+interface g0/0.60
+ encapsulation dot1Q 60
+ ip address 192.168.60.1 255.255.255.0
+ exit
+!
+interface g0/0.70
+ encapsulation dot1Q 70
+ ip address 192.168.70.1 255.255.255.0
+ exit
+!
+interface g0/0.80
+ encapsulation dot1Q 80
+ ip address 192.168.80.1 255.255.255.0
+ exit
+!
+interface g0/0.90
+ encapsulation dot1Q 90
+ ip address 192.168.90.1 255.255.255.0
+ exit
+!
+interface g0/0.100
+ encapsulation dot1Q 100
+ ip address 192.168.100.1 255.255.255.0
+ exit
+!

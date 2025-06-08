@@ -1,0 +1,28 @@
+enable
+configure terminal
+hostname CoreSwitch
+
+vlan 10
+name A-Development
+vlan 20
+name D-Guest
+vlan 30
+name B-IT
+vlan 40
+name C-Sales
+vlan 50
+name H-Admin
+vlan 60
+name F-HR
+vlan 70
+name E-Finance
+vlan 80
+name J-Design
+vlan 90
+name I-Marketing
+vlan 100
+name Infrastructure
+interface range f0/1 - 11
+switchport mode trunk
+switchport trunk allowed vlan 10,20,30,40,50,60,70,80,90,100
+exit

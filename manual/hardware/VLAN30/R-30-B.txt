@@ -1,0 +1,10 @@
+enable
+configure terminal
+hostname R-30-B
+interface g0/0
+no shutdown
+interface g0/0.30
+encapsulation dot1Q 30
+ip address 192.168.30.1 255.255.255.248
+no shut
+exit

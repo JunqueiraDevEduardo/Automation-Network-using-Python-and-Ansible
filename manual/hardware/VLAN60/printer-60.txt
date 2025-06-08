@@ -1,0 +1,9 @@
+enable
+configure terminal
+hostname printer-1-60
+interface f0/0
+ip address 192.168.60.4 255.255.255.240
+no shutdown
+exit
+ip default-gateway 192.168.60.1
+exit

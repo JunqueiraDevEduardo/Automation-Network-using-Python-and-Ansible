@@ -1,0 +1,11 @@
+enable
+configure terminal
+hostname SW-90-I
+vlan 90
+name Infrastructure
+interface range f0/1 - 12
+switchport mode access
+switchport access vlan 90
+exit
+interface f0/24
+switchport mode trunk

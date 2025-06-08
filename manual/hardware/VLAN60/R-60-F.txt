@@ -1,0 +1,10 @@
+enable
+configure terminal
+hostname R-60-E
+interface g0/0
+no shutdown
+interface g0/0.60
+encapsulation dot1Q 60
+ip address 192.168.60.1 255.255.255.248
+no shut
+exit
