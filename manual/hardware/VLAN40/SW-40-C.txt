@@ -3,7 +3,7 @@ configure terminal
 hostname SW-40-C
 vlan 40
 name Infrastructure
-interface range f0/1 - 12
+interface range f0/1 - 5
 switchport mode access
 switchport access vlan 40
 exit

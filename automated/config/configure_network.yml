@@ -9,20 +9,8 @@
   connection: local
   
   vars:
-    # Load network configuration from YAML
-    network_config: "{{ lookup('file', '../network_data.yml') | from_yaml }}"
-    
-    # Common configuration
-    domain_name: "company.local"
-    ntp_server: "pool.ntp.org"
-    dns_servers:
-      - "8.8.8.8"
-      - "8.8.4.4"
-    
-    # SNMP Configuration
-    snmp_community: "public"
-    snmp_location: "Main Office"
-    snmp_contact: "network-admin@company.local"
+   #Global configuration
+    project_name: "Small-Software-Company-Network" #name for the network of my project
     
     # Security settings
     enable_secret: "enable123"

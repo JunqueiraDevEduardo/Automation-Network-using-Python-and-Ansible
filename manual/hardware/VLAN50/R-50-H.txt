@@ -1,10 +1,11 @@
 enable
 configure terminal
 hostname R-50-H
-interface g0/0
-no shutdown
-interface g0/0.50
-encapsulation dot1Q 50
+interface g0/0/0
 ip address 192.168.50.1 255.255.255.248
-no shut
+no shutdown
+exit
+interface g0/0/1
+ip address 192.168.50.20 255.255.255.248
+no shutdown
 exit

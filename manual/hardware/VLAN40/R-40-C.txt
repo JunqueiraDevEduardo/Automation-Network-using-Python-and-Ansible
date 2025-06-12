@@ -1,10 +1,11 @@
 enable
 configure terminal
 hostname R-40-C
-interface g0/0
-no shutdown
-interface g0/0.40
-encapsulation dot1Q 40
+interface g0/0/0
 ip address 192.168.40.1 255.255.255.248
-no shut
+no shutdown
+exit
+interface g0/0/1
+ip address 192.168.40.20 255.255.255.248
+no shutdown
 exit

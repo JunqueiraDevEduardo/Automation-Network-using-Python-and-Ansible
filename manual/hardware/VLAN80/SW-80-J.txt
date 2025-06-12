@@ -3,7 +3,7 @@ configure terminal
 hostname SW-80-J
 vlan 80
 name Infrastructure
-interface range f0/1 - 12
+interface range f0/1 - 3
 switchport mode access
 switchport access vlan 80
 exit

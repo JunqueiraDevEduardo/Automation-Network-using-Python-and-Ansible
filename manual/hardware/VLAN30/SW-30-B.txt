@@ -3,7 +3,7 @@ configure terminal
 hostname SW-30-B
 vlan 30
 name Infrastructure
-interface range f0/1 - 12
+interface range f0/1 - 8
 switchport mode access
 switchport access vlan 30
 exit

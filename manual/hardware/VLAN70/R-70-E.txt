@@ -1,10 +1,11 @@
 enable
 configure terminal
 hostname R-70-E
-interface g0/0
-no shutdown
-interface g0/0.70
-encapsulation dot1Q 70
+interface g0/0/0
 ip address 192.168.70.1 255.255.255.248
-no shut
+no shutdown
+exit
+interface g0/0/1
+ip address 192.168.70.20 255.255.255.248
+no shutdown
 exit
