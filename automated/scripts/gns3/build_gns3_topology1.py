@@ -11,8 +11,16 @@ import json
 import time
 import math
 import os
+import base64
+from bs4 import BeautifulSoup
 from typing import Dict, List, Optional, Tuple, Any
 from pathlib import Path
+from getpass import getpass
+
+# Prompt for credentials
+username = input("Enter GNS3 username: ").strip()
+password = getpass("Enter GNS3 password: ").strip()
+
 
 class SoftwareCompanyNetworkBuilder:
     """
@@ -30,22 +38,36 @@ class SoftwareCompanyNetworkBuilder:
         self.config_file = config_file
         self.server = gns3_server
         self.session = requests.Session()
-        self.session.headers.update({'Authorization': 'Basic eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTc0OTg5OTQ5OH0.MJ8b-F5ayhzRxeS5rd-yvfdl0fr5BvIJH2cfpYN7X-Q='})
         self.project_id = project_id
+        self.auth = (username, password)
         self.project_name = "Software_Company_Network"
         self.templates = {}
         self.api_version = "v3"
         
-        # Load or create network configuration
-        self.load_or_create_config()
-        
-        # Track created nodes and links
-        self.created_nodes = {}
-        self.created_links = []
-        
-        # Port tracking for systematic connections
-        self.router_ports = {}
-        self.switch_ports = {}
+
+# Load the original script
+with open("build_gns3_topology.py", "r") as f:
+    original_code = f.read()
+
+# Remove any existing self.session.auth assignments
+lines = original_code.splitlines()
+updated_lines = []
+for line in lines:
+    if "self.session.auth" not in line:
+        updated_lines.append(line)
+
+# Add the Authorization header to self.session.headers
+    for i, line in enumerate(updated_lines):
+        if "self.session = requests.Session()" in line:
+            indent = line[:len(line) - len(line.lstrip())]
+            self.auth = (username, password)
+        break
+
+# Save the updated script
+    with open("build_gns3_topology.py", "w") as f:
+        f.write("\n".join(updated_lines))
+
+    print("✅ Script atualizado com cabeçalho Authorization e sem self.session.auth.")
 
     def load_or_create_config(self):
         """Load existing config or create based on your specifications"""
@@ -967,40 +989,6 @@ def main():
     print("🌐 GNS3 Software Company Network Builder")
     print("=" * 60)
     
-    try:
-        # Initialize builder
-        builder = SoftwareCompanyNetworkBuilder()
-        
-        # Build the complete network
-        success = builder.build_network()
-        
-        if success:
-            print(f"\n🎉 Network build completed successfully!")
-            
-            # Export documentation
-            builder.export_network_documentation()
-            
-            # Get project status
-            builder.get_project_status()
-            
-            # Ask user if they want to start all nodes
-            start_nodes = input(f"\n🚀 Start all network nodes? (y/n): ").lower().strip()
-            if start_nodes in ['y', 'yes']:
-                builder.start_all_nodes()
-            
-            print(f"\n✅ All operations completed!")
-            print(f"🔗 Access your project at: {builder.server}")
-            print(f"📋 Project ID: {builder.project_id}")
-            
-        else:
-            print(f"\n❌ Network build failed!")
-            
-    except KeyboardInterrupt:
-        print(f"\n⚠ Operation cancelled by user")
-    except Exception as e:
-        print(f"\n❌ Critical error: {e}")
-        import traceback
-        traceback.print_exc()
 
 if __name__ == "__main__":
     main()

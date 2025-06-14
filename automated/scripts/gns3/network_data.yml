@@ -1,0 +1,209 @@
+departments:
+- broadcast: 192.168.10.15
+  code: A
+  color: '#FF6B6B'
+  devices:
+    pc: 6
+    printer: 0
+    router: 1
+    server: 1
+    switch: 1
+  first_host: 192.168.10.1
+  gateway: 192.168.10.1
+  last_host: 192.168.10.14
+  max_hosts: 14
+  name: Development_Engineering
+  network: 192.168.10.0
+  real_hosts: 9
+  subnet_mask: 255.255.255.240
+  vlan_id: 10
+- broadcast: 192.168.30.15
+  code: B
+  color: '#4ECDC4'
+  devices:
+    pc: 6
+    printer: 1
+    router: 1
+    server: 0
+    switch: 1
+  first_host: 192.168.30.1
+  gateway: 192.168.30.1
+  last_host: 192.168.30.14
+  max_hosts: 14
+  name: IT_Network
+  network: 192.168.30.0
+  real_hosts: 9
+  subnet_mask: 255.255.255.240
+  vlan_id: 30
+- broadcast: 192.168.40.15
+  code: C
+  color: '#45B7D1'
+  devices:
+    pc: 3
+    printer: 1
+    router: 1
+    server: 0
+    switch: 1
+  first_host: 192.168.40.1
+  gateway: 192.168.40.1
+  last_host: 192.168.40.14
+  max_hosts: 14
+  name: Sales_Marketing
+  network: 192.168.40.0
+  real_hosts: 6
+  subnet_mask: 255.255.255.240
+  vlan_id: 40
+- broadcast: 192.168.20.15
+  code: D
+  color: '#96CEB4'
+  devices:
+    pc: 5
+    printer: 0
+    router: 1
+    server: 0
+    switch: 1
+  first_host: 192.168.20.1
+  gateway: 192.168.20.1
+  last_host: 192.168.20.14
+  max_hosts: 14
+  name: Guest_Network
+  network: 192.168.20.0
+  real_hosts: 7
+  subnet_mask: 255.255.255.240
+  vlan_id: 20
+- broadcast: 192.168.70.15
+  code: E
+  color: '#FFEAA7'
+  devices:
+    pc: 2
+    printer: 1
+    router: 1
+    server: 0
+    switch: 1
+  first_host: 192.168.70.1
+  gateway: 192.168.70.1
+  last_host: 192.168.70.14
+  max_hosts: 14
+  name: Accounts_Finance
+  network: 192.168.70.0
+  real_hosts: 5
+  subnet_mask: 255.255.255.240
+  vlan_id: 70
+- broadcast: 192.168.60.7
+  code: F
+  color: '#DDA0DD'
+  devices:
+    pc: 2
+    printer: 0
+    router: 1
+    server: 0
+    switch: 1
+  first_host: 192.168.60.1
+  gateway: 192.168.60.1
+  last_host: 192.168.60.6
+  max_hosts: 14
+  name: Human_Resources
+  network: 192.168.60.0
+  real_hosts: 5
+  subnet_mask: 255.255.255.248
+  vlan_id: 60
+- broadcast: 192.168.0.15
+  code: G
+  color: '#FF7675'
+  devices:
+    pc: 4
+    printer: 0
+    router: 1
+    server: 6
+    switch: 1
+  first_host: 192.168.0.1
+  gateway: 192.168.0.1
+  last_host: 192.168.0.14
+  max_hosts: 14
+  name: Infrastructure_Security
+  network: 192.168.0.0
+  real_hosts: 12
+  subnet_mask: 255.255.255.240
+  vlan_id: 0
+- broadcast: 192.168.50.7
+  code: H
+  color: '#A29BFE'
+  devices:
+    pc: 2
+    printer: 0
+    router: 1
+    server: 0
+    switch: 1
+  first_host: 192.168.50.1
+  gateway: 192.168.50.1
+  last_host: 192.168.50.6
+  max_hosts: 14
+  name: Admin_Department
+  network: 192.168.50.0
+  real_hosts: 4
+  subnet_mask: 255.255.255.248
+  vlan_id: 50
+- broadcast: 192.168.90.15
+  code: I
+  color: '#6C5CE7'
+  devices:
+    pc: 2
+    printer: 0
+    router: 1
+    server: 0
+    switch: 1
+  first_host: 192.168.90.1
+  gateway: 192.168.90.1
+  last_host: 192.168.90.14
+  max_hosts: 14
+  name: Marketing_Department
+  network: 192.168.90.0
+  real_hosts: 4
+  subnet_mask: 255.255.255.240
+  vlan_id: 90
+- broadcast: 192.168.80.7
+  code: J
+  color: '#00B894'
+  devices:
+    pc: 2
+    printer: 0
+    router: 1
+    server: 0
+    switch: 1
+  first_host: 192.168.80.1
+  gateway: 192.168.80.1
+  last_host: 192.168.80.6
+  max_hosts: 14
+  name: Design_Department
+  network: 192.168.80.0
+  real_hosts: 4
+  subnet_mask: 255.255.255.248
+  vlan_id: 80
+infrastructure:
+  core_router:
+    model: Cisco C7200
+    name: Core-Router-Main
+    position:
+      x: 0
+      y: 0
+    template: c7200
+  core_switch:
+    model: Cisco Catalyst 3560
+    name: Core-Switch-Main
+    position:
+      x: 0
+      y: -150
+    template: ethernet_switch
+  internet_cloud:
+    name: Internet-Cloud
+    position:
+      x: 0
+      y: -300
+    template: cloud
+project_name: Software_Company_Network
+topology:
+  center_position:
+    x: 0
+    y: 0
+  department_radius: 500
+  device_radius: 180
