@@ -1,0 +1,275 @@
+all:
+  children:
+    pcs:
+      hosts:
+        PC-A-01:
+          ansible_host: 192.168.10.2
+          default_gateway: 192.168.10.1
+          department: Development_Engineering
+          vlan_id: 10
+        PC-A-02:
+          ansible_host: 192.168.10.3
+          default_gateway: 192.168.10.1
+          department: Development_Engineering
+          vlan_id: 10
+        PC-A-03:
+          ansible_host: 192.168.10.4
+          default_gateway: 192.168.10.1
+          department: Development_Engineering
+          vlan_id: 10
+        PC-A-04:
+          ansible_host: 192.168.10.5
+          default_gateway: 192.168.10.1
+          department: Development_Engineering
+          vlan_id: 10
+        PC-A-05:
+          ansible_host: 192.168.10.6
+          default_gateway: 192.168.10.1
+          department: Development_Engineering
+          vlan_id: 10
+        PC-A-06:
+          ansible_host: 192.168.10.7
+          default_gateway: 192.168.10.1
+          department: Development_Engineering
+          vlan_id: 10
+        PC-B-01:
+          ansible_host: 192.168.30.2
+          default_gateway: 192.168.30.1
+          department: IT_Network
+          vlan_id: 30
+        PC-B-02:
+          ansible_host: 192.168.30.3
+          default_gateway: 192.168.30.1
+          department: IT_Network
+          vlan_id: 30
+        PC-B-03:
+          ansible_host: 192.168.30.4
+          default_gateway: 192.168.30.1
+          department: IT_Network
+          vlan_id: 30
+        PC-B-04:
+          ansible_host: 192.168.30.5
+          default_gateway: 192.168.30.1
+          department: IT_Network
+          vlan_id: 30
+        PC-B-05:
+          ansible_host: 192.168.30.6
+          default_gateway: 192.168.30.1
+          department: IT_Network
+          vlan_id: 30
+        PC-B-06:
+          ansible_host: 192.168.30.7
+          default_gateway: 192.168.30.1
+          department: IT_Network
+          vlan_id: 30
+        PC-C-01:
+          ansible_host: 192.168.40.2
+          default_gateway: 192.168.40.1
+          department: Sales_Marketing
+          vlan_id: 40
+        PC-C-02:
+          ansible_host: 192.168.40.3
+          default_gateway: 192.168.40.1
+          department: Sales_Marketing
+          vlan_id: 40
+        PC-C-03:
+          ansible_host: 192.168.40.4
+          default_gateway: 192.168.40.1
+          department: Sales_Marketing
+          vlan_id: 40
+        PC-D-01:
+          ansible_host: 192.168.20.2
+          default_gateway: 192.168.20.1
+          department: Guest_Network
+          vlan_id: 20
+        PC-D-02:
+          ansible_host: 192.168.20.3
+          default_gateway: 192.168.20.1
+          department: Guest_Network
+          vlan_id: 20
+        PC-D-03:
+          ansible_host: 192.168.20.4
+          default_gateway: 192.168.20.1
+          department: Guest_Network
+          vlan_id: 20
+        PC-D-04:
+          ansible_host: 192.168.20.5
+          default_gateway: 192.168.20.1
+          department: Guest_Network
+          vlan_id: 20
+        PC-D-05:
+          ansible_host: 192.168.20.6
+          default_gateway: 192.168.20.1
+          department: Guest_Network
+          vlan_id: 20
+        PC-E-01:
+          ansible_host: 192.168.70.2
+          default_gateway: 192.168.70.1
+          department: Accounts_Finance
+          vlan_id: 70
+        PC-E-02:
+          ansible_host: 192.168.70.3
+          default_gateway: 192.168.70.1
+          department: Accounts_Finance
+          vlan_id: 70
+        PC-F-01:
+          ansible_host: 192.168.60.2
+          default_gateway: 192.168.60.1
+          department: Human_Resources
+          vlan_id: 60
+        PC-F-02:
+          ansible_host: 192.168.60.3
+          default_gateway: 192.168.60.1
+          department: Human_Resources
+          vlan_id: 60
+        PC-G-01:
+          ansible_host: 192.168.0.2
+          default_gateway: 192.168.0.1
+          department: Infrastructure_Security
+          vlan_id: 0
+        PC-G-02:
+          ansible_host: 192.168.0.3
+          default_gateway: 192.168.0.1
+          department: Infrastructure_Security
+          vlan_id: 0
+        PC-G-03:
+          ansible_host: 192.168.0.4
+          default_gateway: 192.168.0.1
+          department: Infrastructure_Security
+          vlan_id: 0
+        PC-G-04:
+          ansible_host: 192.168.0.5
+          default_gateway: 192.168.0.1
+          department: Infrastructure_Security
+          vlan_id: 0
+        PC-H-01:
+          ansible_host: 192.168.50.2
+          default_gateway: 192.168.50.1
+          department: Admin_Department
+          vlan_id: 50
+        PC-H-02:
+          ansible_host: 192.168.50.3
+          default_gateway: 192.168.50.1
+          department: Admin_Department
+          vlan_id: 50
+        PC-I-01:
+          ansible_host: 192.168.90.2
+          default_gateway: 192.168.90.1
+          department: Marketing_Department
+          vlan_id: 90
+        PC-I-02:
+          ansible_host: 192.168.90.3
+          default_gateway: 192.168.90.1
+          department: Marketing_Department
+          vlan_id: 90
+        PC-J-01:
+          ansible_host: 192.168.80.2
+          default_gateway: 192.168.80.1
+          department: Design_Department
+          vlan_id: 80
+        PC-J-02:
+          ansible_host: 192.168.80.3
+          default_gateway: 192.168.80.1
+          department: Design_Department
+          vlan_id: 80
+    routers:
+      hosts: {}
+    servers:
+      hosts:
+        Server-A-01:
+          ansible_host: 192.168.10.9
+          default_gateway: 192.168.10.1
+          department: Development_Engineering
+          vlan_id: 10
+        Server-G-01:
+          ansible_host: 192.168.0.7
+          default_gateway: 192.168.0.1
+          department: Infrastructure_Security
+          vlan_id: 0
+        Server-G-02:
+          ansible_host: 192.168.0.8
+          default_gateway: 192.168.0.1
+          department: Infrastructure_Security
+          vlan_id: 0
+        Server-G-03:
+          ansible_host: 192.168.0.9
+          default_gateway: 192.168.0.1
+          department: Infrastructure_Security
+          vlan_id: 0
+        Server-G-04:
+          ansible_host: 192.168.0.10
+          default_gateway: 192.168.0.1
+          department: Infrastructure_Security
+          vlan_id: 0
+        Server-G-05:
+          ansible_host: 192.168.0.11
+          default_gateway: 192.168.0.1
+          department: Infrastructure_Security
+          vlan_id: 0
+        Server-G-06:
+          ansible_host: 192.168.0.12
+          default_gateway: 192.168.0.1
+          department: Infrastructure_Security
+          vlan_id: 0
+    switches:
+      hosts:
+        SW-A-Development_Engineering:
+          ansible_host: 192.168.10.1
+          department: Development_Engineering
+          mgmt_ip: 192.168.10.1
+          network: 192.168.10.0
+          vlan_id: 10
+        SW-B-IT_Network:
+          ansible_host: 192.168.30.1
+          department: IT_Network
+          mgmt_ip: 192.168.30.1
+          network: 192.168.30.0
+          vlan_id: 30
+        SW-C-Sales_Marketing:
+          ansible_host: 192.168.40.1
+          department: Sales_Marketing
+          mgmt_ip: 192.168.40.1
+          network: 192.168.40.0
+          vlan_id: 40
+        SW-D-Guest_Network:
+          ansible_host: 192.168.20.1
+          department: Guest_Network
+          mgmt_ip: 192.168.20.1
+          network: 192.168.20.0
+          vlan_id: 20
+        SW-E-Accounts_Finance:
+          ansible_host: 192.168.70.1
+          department: Accounts_Finance
+          mgmt_ip: 192.168.70.1
+          network: 192.168.70.0
+          vlan_id: 70
+        SW-F-Human_Resources:
+          ansible_host: 192.168.60.1
+          department: Human_Resources
+          mgmt_ip: 192.168.60.1
+          network: 192.168.60.0
+          vlan_id: 60
+        SW-G-Infrastructure_Security:
+          ansible_host: 192.168.0.1
+          department: Infrastructure_Security
+          mgmt_ip: 192.168.0.1
+          network: 192.168.0.0
+          vlan_id: 0
+        SW-H-Admin_Department:
+          ansible_host: 192.168.50.1
+          department: Admin_Department
+          mgmt_ip: 192.168.50.1
+          network: 192.168.50.0
+          vlan_id: 50
+        SW-I-Marketing_Department:
+          ansible_host: 192.168.90.1
+          department: Marketing_Department
+          mgmt_ip: 192.168.90.1
+          network: 192.168.90.0
+          vlan_id: 90
+        SW-J-Design_Department:
+          ansible_host: 192.168.80.1
+          department: Design_Department
+          mgmt_ip: 192.168.80.1
+          network: 192.168.80.0
+          vlan_id: 80

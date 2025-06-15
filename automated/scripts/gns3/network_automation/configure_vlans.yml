@@ -1,0 +1,53 @@
+---
+- name: Configure VLANs on Network Switches
+  hosts: switches
+  gather_facts: no
+  connection: network_cli
+  
+  vars:
+    ansible_network_os: ios
+    ansible_user: admin
+    ansible_password: admin
+    ansible_become: yes
+    ansible_become_method: enable
+    
+  tasks:
+    - name: Configure VLANs
+      cisco.ios.ios_vlans:
+        config:
+          - vlan_id: 10
+            name: "Development-Engineering"
+            state: active
+          - vlan_id: 30
+            name: "IT-Network"
+            state: active
+          - vlan_id: 40
+            name: "Sales-Marketing"
+            state: active
+          - vlan_id: 20
+            name: "Guest-Network"
+            state: active
+          - vlan_id: 70
+            name: "Accounts-Finance"
+            state: active
+          - vlan_id: 60
+            name: "Human-Resources"
+            state: active
+          - vlan_id: 0
+            name: "Infrastructure-Security"
+            state: active
+          - vlan_id: 50
+            name: "Admin-Department"
+            state: active
+          - vlan_id: 90
+            name: "Marketing-Department"
+            state: active
+          - vlan_id: 80
+            name: "Design-Department"
+            state: active
+
+        state: merged
+        
+    - name: Save configuration
+      cisco.ios.ios_config:
+        save_when: always
