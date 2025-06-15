@@ -4,17 +4,17 @@ This directory contains automated configuration files generated from your manual
 
 ## Generated Files
 
-### 📋 Inventory
+### Inventory
 - `inventory.yml` - Ansible inventory with all network devices
 
-### 🎛️ Playbooks
+### Playbooks
 - `configure_vlans.yml` - Configures VLANs on switches
 - `configure_interfaces.yml` - Configures switch interfaces
 
-### 🖥️ Scripts
+### Scripts
 - `configure_pcs.sh` - Script to configure PC network settings
 
-### 📊 Documentation
+### Documentation
 - `network_diagram.json` - Network topology data for visualization
 - `README.md` - This file
 
