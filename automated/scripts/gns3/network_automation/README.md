@@ -48,5 +48,5 @@ chmod +x configure_pcs.sh
 
 ## Network Overview
 
-**Departments:** 10
+**Departments:** 0
 **VLANs configured:**

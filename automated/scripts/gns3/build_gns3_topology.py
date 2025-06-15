@@ -1,732 +1,603 @@
 #!/usr/bin/env python3
-############################################################
-# FIXED GNS3 Network Builder for Software Company
-# Builds automated network topology based on department specifications
-# Supports 10 departments with proper VLAN segmentation
-# FIXES: Authentication, repetitive logging, proper error handling
-############################################################
+"""
+Network Automation Generator
+Converts your manual Cisco configurations to automated network deployment
+Works with existing GNS3 projects and generates Ansible playbooks
+"""
 
-import requests
 import yaml
 import json
-import time
-import math
-import os
-import getpass
-import base64
-from typing import Dict, List, Optional, Tuple, Any
+import re
+from typing import Dict, List, Optional, Tuple
 from pathlib import Path
-import urllib3
+import ipaddress
 
-# Disable SSL warnings for local GNS3 server
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-class SoftwareCompanyNetworkBuilder:
-    """
-    Fixed GNS3 Builder for Software Company Network
-    Builds a complete corporate network with 10 departments
-    """
-    
-    def __init__(self, 
-                 config_file: str = "network_data.yml",
-                 gns3_server: str = "http://127.0.0.1:3080",
-                 username: str = None,
-                 password: str = None,
-                 project_name: str = "Software_Company_Network"):
-        """
-        Initialize the network builder
-        """
+class NetworkAutomationGenerator:
+    def __init__(self, config_file: str = "network_data.yml"):
         self.config_file = config_file
-        self.server = gns3_server.rstrip('/')
-        self.session = requests.Session()
+        self.load_config()
+        self.devices = {}
+        self.vlans = {}
+        self.networks = {}
         
-        # Setup authentication
-        self.setup_authentication(username, password)
-        
-        # Session configuration
-        self.session.verify = False
-        self.session.headers.update({
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        })
-        
-        self.project_id = None
-        self.project_name = project_name
-        self.templates = {}
-        self.api_version = "v2"  # Start with v2, will auto-detect
-        
-        # Load network configuration
-        self.load_or_create_config()
-        
-        # Track created nodes and links
-        self.created_nodes = {}
-        self.created_links = []
-        
-        # Port tracking
-        self.router_ports = {}
-        self.switch_ports = {}
-
-    def get_auth_token(self, username: str, password: str) -> Optional[str]:
-        """Get authentication token from GNS3 server"""
-        try:
-            # Try to get token using login endpoint
-            login_url = f"{self.server}/v3/access/users/login"
-            login_data = {"username": username, "password": password}
-            
-            response = requests.post(login_url, json=login_data, timeout=10, verify=False)
-            
-            if response.status_code == 200:
-                token_data = response.json()
-                token = token_data.get("token")
-                if token:
-                    print(f"✓ Retrieved authentication token")
-                    return token
-            else:
-                print(f"⚠ Login endpoint failed: {response.status_code}")
-                
-        except Exception as e:
-            print(f"⚠ Token retrieval failed: {e}")
-        
-        return None
-
-    def setup_authentication(self, username: str = None, password: str = None):
-        """Setup authentication for GNS3"""
-        if not username:
-            username = os.getenv('GNS3_USERNAME', 'admin')
-        if not password:
-            password = os.getenv('GNS3_PASSWORD', 'admin')
-        
-        # Try to get authentication token first
-        token = self.get_auth_token(username, password)
-        
-        # Setup multiple authentication methods to try
-        self.auth_methods = []
-        
-        if token:
-            self.auth_methods.append(('bearer', token))
-            
-        self.auth_methods.extend([
-            ('basic', (username, password)),
-            ('none', None)
-        ])
-        
-        print(f"🔐 Setting up authentication for user: {username}")
-
-    def test_authentication_method(self, method_type: str, auth_data: Any) -> bool:
-        """Test a specific authentication method"""
-        test_session = requests.Session()
-        test_session.verify = False
-        
-        if method_type == 'basic' and auth_data:
-            test_session.auth = auth_data
-        elif method_type == 'bearer' and auth_data:
-            test_session.headers.update({'Authorization': f'Bearer {auth_data}'})
-        
-        try:
-            # Test both version and projects endpoints
-            response = test_session.get(f"{self.server}/v2/version", timeout=5)
-            if response.status_code == 200:
-                # Also test projects endpoint
-                projects_response = test_session.get(f"{self.server}/v2/projects", timeout=5)
-                return projects_response.status_code in [200, 401]  # 401 means auth method recognized but needs proper creds
-            
-            response = test_session.get(f"{self.server}/v3/version", timeout=5)
-            if response.status_code == 200:
-                # Also test projects endpoint
-                projects_response = test_session.get(f"{self.server}/v3/projects", timeout=5)
-                return projects_response.status_code in [200, 401]
-            
-            return False
-        except:
-            return False
-
-    def load_or_create_config(self):
-        """Load existing config or create based on specifications"""
+    def load_config(self):
+        """Load network configuration"""
         try:
             with open(self.config_file, 'r') as file:
                 self.config = yaml.safe_load(file)
             print(f"✓ Loaded configuration from {self.config_file}")
         except FileNotFoundError:
-            print(f"⚠ Creating new configuration")
-            self.config = self.create_software_company_config()
-            self.save_config()
+            print(f"❌ Configuration file {self.config_file} not found")
+            self.config = {"departments": []}
 
-    def create_software_company_config(self) -> Dict[str, Any]:
-        """Create configuration based on your network specifications"""
-        return {
-            "project_name": self.project_name,
-            "topology": {
-                "center_position": {"x": 0, "y": 0},
-                "department_radius": 400,
-                "device_radius": 120
-            },
-            "infrastructure": {
-                "core_switch": {
-                    "name": "CoreSwitch",
-                    "template": "ethernet_switch",
-                    "position": {"x": 0, "y": 0}
-                }
-            },
-            "departments": [
-                {
-                    "name": "Development",
-                    "code": "A",
-                    "vlan_id": 10,
-                    "network": "192.168.10.0/28",
-                    "gateway": "192.168.10.1",
-                    "devices": {"router": 1, "switch": 1, "pc": 6, "server": 1}
-                },
-                {
-                    "name": "Guest",
-                    "code": "D", 
-                    "vlan_id": 20,
-                    "network": "192.168.20.0/28",
-                    "gateway": "192.168.20.1",
-                    "devices": {"router": 1, "switch": 1, "pc": 5}
-                },
-                {
-                    "name": "IT",
-                    "code": "B",
-                    "vlan_id": 30,
-                    "network": "192.168.30.0/28", 
-                    "gateway": "192.168.30.1",
-                    "devices": {"router": 1, "switch": 1, "pc": 6, "server": 1}
-                },
-                {
-                    "name": "Sales",
-                    "code": "C",
-                    "vlan_id": 40,
-                    "network": "192.168.40.0/29",
-                    "gateway": "192.168.40.1",
-                    "devices": {"router": 1, "switch": 1, "pc": 3, "printer": 1}
-                },
-                {
-                    "name": "Admin",
-                    "code": "H", 
-                    "vlan_id": 50,
-                    "network": "192.168.50.0/29",
-                    "gateway": "192.168.50.1",
-                    "devices": {"router": 1, "switch": 1, "pc": 2}
-                },
-                {
-                    "name": "HR",
-                    "code": "F",
-                    "vlan_id": 60,
-                    "network": "192.168.60.0/29",
-                    "gateway": "192.168.60.1", 
-                    "devices": {"router": 1, "switch": 1, "pc": 2, "printer": 1}
-                },
-                {
-                    "name": "Finance",
-                    "code": "E",
-                    "vlan_id": 70,
-                    "network": "192.168.70.0/29",
-                    "gateway": "192.168.70.1",
-                    "devices": {"router": 1, "switch": 1, "pc": 2, "server": 1}
-                },
-                {
-                    "name": "Design",
-                    "code": "J",
-                    "vlan_id": 80,
-                    "network": "192.168.80.0/29", 
-                    "gateway": "192.168.80.1",
-                    "devices": {"router": 1, "switch": 1, "pc": 2}
-                },
-                {
-                    "name": "Marketing",
-                    "code": "I",
-                    "vlan_id": 90,
-                    "network": "192.168.90.0/29",
-                    "gateway": "192.168.90.1",
-                    "devices": {"router": 1, "switch": 1, "pc": 2}
-                },
-                {
-                    "name": "Infrastructure", 
-                    "code": "G",
-                    "vlan_id": 100,
-                    "network": "192.168.0.0/28",
-                    "gateway": "192.168.0.1",
-                    "devices": {"router": 1, "switch": 1, "pc": 4, "server": 6}
-                }
-            ]
-        }
-
-    def save_config(self):
-        """Save configuration to YAML file"""
-        with open(self.config_file, 'w') as file:
-            yaml.dump(self.config, file, default_flow_style=False, indent=2)
-        print(f"✓ Configuration saved to {self.config_file}")
-
-    def test_server_connection(self) -> bool:
-        """Test connection and find working authentication"""
-        print(f"🔍 Testing connection to {self.server}...")
+    def parse_manual_config(self, config_text: str) -> Dict:
+        """Parse your manual Cisco configuration"""
+        print("🔍 Parsing manual configuration...")
         
-        # Test different authentication methods
-        for method_type, auth_data in self.auth_methods:
-            print(f"  Trying {method_type} authentication...")
+        # Split configuration by device sections
+        devices = {}
+        current_device = None
+        current_config = []
+        
+        lines = config_text.strip().split('\n')
+        
+        for line in lines:
+            line = line.strip()
             
-            test_session = requests.Session()
-            test_session.verify = False
+            # Check for device headers (like -Core Switch, -VLAN 10, etc.)
+            if line.startswith('-'):
+                if current_device and current_config:
+                    devices[current_device] = '\n'.join(current_config)
+                
+                current_device = line[1:].strip()
+                current_config = []
+            elif line and current_device:
+                current_config.append(line)
+        
+        # Add the last device
+        if current_device and current_config:
+            devices[current_device] = '\n'.join(current_config)
+        
+        print(f"✓ Parsed {len(devices)} device configurations")
+        return devices
+
+    def extract_device_info(self, config_text: str) -> Dict:
+        """Extract device information from configuration"""
+        device_info = {
+            'hostname': None,
+            'interfaces': {},
+            'vlans': {},
+            'type': 'unknown',
+            'ip_addresses': [],
+            'default_gateway': None
+        }
+        
+        lines = config_text.split('\n')
+        current_interface = None
+        
+        for line in lines:
+            line = line.strip()
             
-            if method_type == 'basic' and auth_data:
-                test_session.auth = auth_data
-            elif method_type == 'bearer' and auth_data:
-                test_session.headers.update({'Authorization': f'Bearer {auth_data}'})
+            # Extract hostname
+            if line.startswith('hostname '):
+                device_info['hostname'] = line.split()[1]
+                
+                # Determine device type from hostname
+                hostname_lower = device_info['hostname'].lower()
+                if 'switch' in hostname_lower or 'sw-' in hostname_lower:
+                    device_info['type'] = 'switch'
+                elif 'router' in hostname_lower or 'r-' in hostname_lower:
+                    device_info['type'] = 'router'
+                elif 'pc-' in hostname_lower:
+                    device_info['type'] = 'pc'
+                elif 'server' in hostname_lower:
+                    device_info['type'] = 'server'
             
-            # Test both version and projects endpoints
+            # Extract VLAN information
+            elif line.startswith('vlan '):
+                vlan_id = line.split()[1]
+                device_info['vlans'][vlan_id] = {}
+            elif line.startswith('name ') and len(device_info['vlans']) > 0:
+                last_vlan = list(device_info['vlans'].keys())[-1]
+                device_info['vlans'][last_vlan]['name'] = line.split()[1]
+            
+            # Extract interface information
+            elif line.startswith('interface '):
+                current_interface = line.split()[1]
+                device_info['interfaces'][current_interface] = {}
+            elif current_interface and line.startswith('ip address '):
+                parts = line.split()
+                if len(parts) >= 3:
+                    ip_addr = parts[2]
+                    netmask = parts[3] if len(parts) > 3 else '255.255.255.0'
+                    device_info['interfaces'][current_interface]['ip'] = ip_addr
+                    device_info['interfaces'][current_interface]['netmask'] = netmask
+                    device_info['ip_addresses'].append(f"{ip_addr}/{netmask}")
+            elif current_interface and line.startswith('switchport mode '):
+                device_info['interfaces'][current_interface]['mode'] = line.split()[2]
+            elif current_interface and line.startswith('switchport access vlan '):
+                device_info['interfaces'][current_interface]['vlan'] = line.split()[3]
+            elif current_interface and line.startswith('switchport trunk allowed vlan '):
+                device_info['interfaces'][current_interface]['allowed_vlans'] = line.split()[4]
+            
+            # Extract default gateway
+            elif line.startswith('ip default-gateway '):
+                device_info['default_gateway'] = line.split()[1]
+        
+        return device_info
+
+    def generate_network_inventory(self) -> Dict:
+        """Generate Ansible inventory from configuration"""
+        print("📋 Generating network inventory...")
+        
+        inventory = {
+            'all': {
+                'children': {
+                    'switches': {'hosts': {}},
+                    'routers': {'hosts': {}},
+                    'pcs': {'hosts': {}},
+                    'servers': {'hosts': {}}
+                }
+            }
+        }
+        
+        # Process departments from YAML config
+        for dept in self.config.get('departments', []):
+            dept_name = dept['name']
+            dept_code = dept['code']
+            vlan_id = dept['vlan_id']
+            network = dept['network']
+            gateway = dept['gateway']
+            
+            # Add department switch
+            switch_name = f"SW-{dept_code}-{dept_name}"
+            inventory['all']['children']['switches']['hosts'][switch_name] = {
+                'ansible_host': gateway,  # Assuming switch has gateway IP
+                'department': dept_name,
+                'vlan_id': vlan_id,
+                'network': network,
+                'mgmt_ip': gateway
+            }
+            
+            # Add department devices
+            devices = dept.get('devices', {})
+            
+            # Add PCs
+            for i in range(devices.get('pc', 0)):
+                pc_name = f"PC-{dept_code}-{i+1:02d}"
+                try:
+                    # Calculate PC IP (gateway + i + 1)
+                    network_obj = ipaddress.IPv4Network(f"{network}/{dept.get('subnet_mask', '255.255.255.240')}", strict=False)
+                    pc_ip = str(list(network_obj.hosts())[i+1])  # Skip gateway
+                    
+                    inventory['all']['children']['pcs']['hosts'][pc_name] = {
+                        'ansible_host': pc_ip,
+                        'department': dept_name,
+                        'vlan_id': vlan_id,
+                        'default_gateway': gateway
+                    }
+                except:
+                    pass
+            
+            # Add servers
+            for i in range(devices.get('server', 0)):
+                server_name = f"Server-{dept_code}-{i+1:02d}"
+                try:
+                    network_obj = ipaddress.IPv4Network(f"{network}/{dept.get('subnet_mask', '255.255.255.240')}", strict=False)
+                    server_ip = str(list(network_obj.hosts())[devices.get('pc', 0) + i + 2])
+                    
+                    inventory['all']['children']['servers']['hosts'][server_name] = {
+                        'ansible_host': server_ip,
+                        'department': dept_name,
+                        'vlan_id': vlan_id,
+                        'default_gateway': gateway
+                    }
+                except:
+                    pass
+        
+        return inventory
+
+    def generate_vlan_config_playbook(self) -> str:
+        """Generate Ansible playbook for VLAN configuration"""
+        print("📝 Generating VLAN configuration playbook...")
+        
+        playbook = """---
+- name: Configure VLANs on Network Switches
+  hosts: switches
+  gather_facts: no
+  connection: network_cli
+  
+  vars:
+    ansible_network_os: ios
+    ansible_user: admin
+    ansible_password: admin
+    ansible_become: yes
+    ansible_become_method: enable
+    
+  tasks:
+    - name: Configure VLANs
+      cisco.ios.ios_vlans:
+        config:
+"""
+        
+        # Add VLAN configurations from departments
+        for dept in self.config.get('departments', []):
+            vlan_id = dept['vlan_id']
+            vlan_name = dept['name'].replace('_', '-')
+            
+            playbook += f"""          - vlan_id: {vlan_id}
+            name: "{vlan_name}"
+            state: active
+"""
+        
+        playbook += """
+        state: merged
+        
+    - name: Save configuration
+      cisco.ios.ios_config:
+        save_when: always
+"""
+        
+        return playbook
+
+    def generate_interface_config_playbook(self) -> str:
+        """Generate Ansible playbook for interface configuration"""
+        print("📝 Generating interface configuration playbook...")
+        
+        playbook = """---
+- name: Configure Switch Interfaces
+  hosts: switches
+  gather_facts: no
+  connection: network_cli
+  
+  vars:
+    ansible_network_os: ios
+    ansible_user: admin
+    ansible_password: admin
+    ansible_become: yes
+    ansible_become_method: enable
+    
+  tasks:
+    - name: Configure access ports
+      cisco.ios.ios_l2_interfaces:
+        config:
+"""
+        
+        # Generate interface configurations based on departments
+        port_num = 1
+        for dept in self.config.get('departments', []):
+            vlan_id = dept['vlan_id']
+            devices = dept.get('devices', {})
+            
+            # Configure access ports for PCs and servers
+            total_devices = devices.get('pc', 0) + devices.get('server', 0) + devices.get('printer', 0)
+            
+            for i in range(total_devices):
+                interface = f"FastEthernet0/{port_num}"
+                playbook += f"""          - name: {interface}
+            access:
+              vlan: {vlan_id}
+"""
+                port_num += 1
+        
+        playbook += """
+        state: merged
+        
+    - name: Save configuration
+      cisco.ios.ios_config:
+        save_when: always
+"""
+        
+        return playbook
+
+    def generate_pc_config_script(self) -> str:
+        """Generate script to configure PC network settings"""
+        print("📝 Generating PC configuration script...")
+        
+        script = """#!/bin/bash
+# PC Network Configuration Script
+# Configures IP addresses and gateways for all department PCs
+
+echo "🖥️ Configuring PC Network Settings..."
+
+"""
+        
+        for dept in self.config.get('departments', []):
+            dept_name = dept['name']
+            dept_code = dept['code']
+            network = dept['network']
+            gateway = dept['gateway']
+            subnet_mask = dept.get('subnet_mask', '255.255.255.240')
+            
+            devices = dept.get('devices', {})
+            
+            script += f"""
+# {dept_name} Department (VLAN {dept['vlan_id']})
+echo "Configuring {dept_name} PCs..."
+"""
+            
             try:
-                for version in ['v2', 'v3']:
-                    # Test version endpoint
-                    version_response = test_session.get(f"{self.server}/{version}/version", timeout=5)
+                network_obj = ipaddress.IPv4Network(f"{network}/{subnet_mask}", strict=False)
+                hosts = list(network_obj.hosts())
+                
+                for i in range(devices.get('pc', 0)):
+                    pc_name = f"PC-{dept_code}-{i+1:02d}"
+                    pc_ip = str(hosts[i+1])  # Skip gateway IP
                     
-                    if version_response.status_code == 200:
-                        # Test projects endpoint with same auth
-                        projects_response = test_session.get(f"{self.server}/{version}/projects", timeout=5)
-                        
-                        if projects_response.status_code == 200:
-                            print(f"✓ {method_type} authentication successful for {version}!")
-                            
-                            # Apply successful authentication to main session
-                            if method_type == 'basic' and auth_data:
-                                self.session.auth = auth_data
-                            elif method_type == 'bearer' and auth_data:
-                                self.session.headers.update({'Authorization': f'Bearer {auth_data}'})
-                            
-                            self.api_version = version
-                            version_info = version_response.json()
-                            print(f"✓ GNS3 Server v{version_info.get('version', 'Unknown')} detected")
-                            return True
-                        else:
-                            print(f"  Version OK but projects failed: {projects_response.status_code}")
-                            
-            except Exception as e:
-                print(f"  {method_type} test failed: {e}")
-                continue
-        
-        print("❌ No working authentication method found")
-        return False
+                    script += f"""
+# Configure {pc_name}
+echo "  Setting up {pc_name}: {pc_ip}"
+# For Ubuntu/Linux PCs:
+# sudo ip addr add {pc_ip}/{network_obj.prefixlen} dev eth0
+# sudo ip route add default via {gateway}
+# echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
 
-    def list_projects(self) -> List[Dict]:
-        """List existing projects"""
-        url = f"{self.server}/{self.api_version}/projects"
+# For Windows PCs (run as administrator):
+# netsh interface ip set address "Ethernet" static {pc_ip} {subnet_mask} {gateway}
+# netsh interface ip set dns "Ethernet" static 8.8.8.8
+"""
+            except:
+                script += f"# Error calculating IPs for {dept_name}\n"
         
-        try:
-            response = self.session.get(url, timeout=10)
-            if response.status_code == 200:
-                projects = response.json()
-                print(f"📋 Found {len(projects)} existing projects:")
-                for project in projects[:5]:  # Show first 5 projects
-                    print(f"  • {project['name']} (ID: {project['project_id'][:8]}...)")
-                return projects
-            else:
-                print(f"⚠ Could not list projects: {response.status_code}")
-                return []
-        except Exception as e:
-            print(f"❌ Error listing projects: {e}")
-            return []
+        script += """
+echo "✅ PC configuration completed!"
+echo "Note: Uncomment and modify the appropriate commands for your OS"
+"""
+        
+        return script
 
-    def create_new_project(self) -> bool:
-        """Create a new GNS3 project"""
-        print(f"🆕 Creating new project: {self.project_name}")
+    def generate_network_diagram_data(self) -> Dict:
+        """Generate data for network diagram"""
+        print("📊 Generating network diagram data...")
         
-        # List existing projects first
-        existing_projects = self.list_projects()
-        
-        # Create unique project name
-        timestamp = int(time.time())
-        unique_name = f"{self.project_name}_{timestamp}"
-        
-        url = f"{self.server}/{self.api_version}/projects"
-        data = {
-            "name": unique_name,
-            "auto_close": False,
-            "auto_open": False,
-            "auto_start": False
+        diagram_data = {
+            'nodes': [],
+            'links': [],
+            'vlans': {}
         }
         
-        try:
-            response = self.session.post(url, json=data, timeout=30)
+        # Add core switch
+        diagram_data['nodes'].append({
+            'id': 'CoreSwitch',
+            'label': 'Core Switch',
+            'type': 'switch',
+            'x': 0,
+            'y': 0,
+            'color': '#FF6B6B'
+        })
+        
+        # Add departments in circular layout
+        import math
+        num_depts = len(self.config.get('departments', []))
+        radius = 300
+        
+        for i, dept in enumerate(self.config.get('departments', [])):
+            angle = (2 * math.pi * i) / num_depts
+            x = int(radius * math.cos(angle))
+            y = int(radius * math.sin(angle))
             
-            if response.status_code == 201:
-                project_data = response.json()
-                self.project_id = project_data["project_id"]
-                self.project_name = unique_name
-                print(f"✓ Project created successfully!")
-                print(f"  Name: {self.project_name}")
-                print(f"  ID: {self.project_id}")
-                return True
-            else:
-                print(f"❌ Failed to create project: {response.status_code}")
-                print(f"Response: {response.text}")
-                return False
-                
-        except Exception as e:
-            print(f"❌ Error creating project: {e}")
-            return False
-
-    def get_templates(self) -> bool:
-        """Get available templates from GNS3"""
-        print("📋 Retrieving templates...")
-        
-        url = f"{self.server}/{self.api_version}/templates"
-        
-        try:
-            response = self.session.get(url, timeout=15)
+            dept_name = dept['name']
+            dept_code = dept['code']
+            vlan_id = dept['vlan_id']
             
-            if response.status_code == 200:
-                templates = response.json()
-                
-                for template in templates:
-                    template_name = template.get('name', '').lower()
-                    template_id = template.get('template_id', template.get('id', ''))
-                    category = template.get('category', 'unknown')
-                    
-                    if template_id:
-                        self.templates[template_name] = {
-                            'id': template_id,
-                            'category': category,
-                            'name': template.get('name', ''),
-                            'builtin': template.get('builtin', False)
-                        }
-                
-                print(f"✓ Retrieved {len(self.templates)} templates")
-                
-                # Show template categories
-                categories = {}
-                for name, info in self.templates.items():
-                    cat = info['category']
-                    categories[cat] = categories.get(cat, 0) + 1
-                
-                print("📋 Available categories:")
-                for category, count in categories.items():
-                    print(f"  {category}: {count} templates")
-                
-                return True
-            else:
-                print(f"⚠ Could not get templates: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            print(f"❌ Error getting templates: {e}")
-            return False
-
-    def find_template_id(self, template_type: str) -> Optional[str]:
-        """Find appropriate template ID for device type"""
-        template_type = template_type.lower()
-        
-        # Direct match
-        if template_type in self.templates:
-            return self.templates[template_type]['id']
-        
-        # Template mappings
-        mappings = {
-            'router': ['c7200', 'c3725', 'c2691', 'c1700', 'router', 'cisco'],
-            'switch': ['ethernet_switch', 'switch', 'c3560', 'catalyst'],
-            'cloud': ['cloud', 'nat'], 
-            'vpcs': ['vpcs', 'pc'],
-            'server': ['server', 'qemu', 'ubuntu', 'linux']
-        }
-        
-        if template_type in mappings:
-            for candidate in mappings[template_type]:
-                for template_name, template_info in self.templates.items():
-                    if candidate in template_name.lower():
-                        print(f"  Using template: {template_info['name']} for {template_type}")
-                        return template_info['id']
-        
-        # Fallback to builtin templates
-        for template_name, template_info in self.templates.items():
-            if template_info.get('builtin', False):
-                print(f"  Using builtin template: {template_info['name']}")
-                return template_info['id']
-        
-        print(f"❌ No template found for {template_type}")
-        return None
-
-    def create_node(self, name: str, template_type: str, x: int, y: int) -> Optional[str]:
-        """Create a network node"""
-        template_id = self.find_template_id(template_type)
-        if not template_id:
-            return None
-        
-        url = f"{self.server}/{self.api_version}/projects/{self.project_id}/nodes"
-        data = {
-            "name": name,
-            "template_id": template_id,
-            "x": x,
-            "y": y
-        }
-        
-        try:
-            response = self.session.post(url, json=data, timeout=30)
+            # Add department switch
+            switch_id = f"SW-{dept_code}"
+            diagram_data['nodes'].append({
+                'id': switch_id,
+                'label': f"Switch {dept_code}\n{dept_name}",
+                'type': 'switch',
+                'x': x,
+                'y': y,
+                'color': dept.get('color', '#4ECDC4'),
+                'vlan': vlan_id
+            })
             
-            if response.status_code == 201:
-                node_data = response.json()
-                node_id = node_data["node_id"]
-                
-                self.created_nodes[name] = {
-                    "node_id": node_id,
-                    "name": name,
-                    "type": template_type,
-                    "position": {"x": x, "y": y}
-                }
-                
-                print(f"✓ Created {template_type}: {name}")
-                return node_id
-            else:
-                print(f"❌ Failed to create {name}: {response.status_code}")
-                return None
-                
-        except Exception as e:
-            print(f"❌ Error creating {name}: {e}")
-            return None
-
-    def create_link(self, node1_name: str, node1_port: int, 
-                   node2_name: str, node2_port: int) -> Optional[str]:
-        """Create link between two nodes"""
-        if node1_name not in self.created_nodes or node2_name not in self.created_nodes:
-            print(f"❌ Cannot link {node1_name} to {node2_name} - nodes not found")
-            return None
-        
-        url = f"{self.server}/{self.api_version}/projects/{self.project_id}/links"
-        data = {
-            "nodes": [
-                {
-                    "node_id": self.created_nodes[node1_name]["node_id"],
-                    "adapter_number": 0,
-                    "port_number": node1_port
-                },
-                {
-                    "node_id": self.created_nodes[node2_name]["node_id"],
-                    "adapter_number": 0,
-                    "port_number": node2_port
-                }
-            ]
-        }
-        
-        try:
-            response = self.session.post(url, json=data, timeout=15)
+            # Link to core switch
+            diagram_data['links'].append({
+                'source': 'CoreSwitch',
+                'target': switch_id,
+                'type': 'trunk',
+                'vlan': vlan_id
+            })
             
-            if response.status_code == 201:
-                link_data = response.json()
-                link_id = link_data["link_id"]
+            # Add devices around department switch
+            devices = dept.get('devices', {})
+            device_radius = 100
+            device_count = devices.get('pc', 0) + devices.get('server', 0)
+            
+            for j in range(device_count):
+                if j < devices.get('pc', 0):
+                    device_id = f"PC-{dept_code}-{j+1}"
+                    device_label = f"PC {j+1}"
+                    device_type = 'pc'
+                else:
+                    server_num = j - devices.get('pc', 0) + 1
+                    device_id = f"Server-{dept_code}-{server_num}"
+                    device_label = f"Server {server_num}"
+                    device_type = 'server'
                 
-                self.created_links.append({
-                    "link_id": link_id,
-                    "node1": node1_name,
-                    "port1": node1_port,
-                    "node2": node2_name,
-                    "port2": node2_port
+                if device_count == 1:
+                    dev_x, dev_y = x, y + device_radius
+                else:
+                    dev_angle = (2 * math.pi * j) / device_count
+                    dev_x = x + int(device_radius * math.cos(dev_angle))
+                    dev_y = y + int(device_radius * math.sin(dev_angle))
+                
+                diagram_data['nodes'].append({
+                    'id': device_id,
+                    'label': device_label,
+                    'type': device_type,
+                    'x': dev_x,
+                    'y': dev_y,
+                    'color': '#95E1D3',
+                    'vlan': vlan_id
                 })
                 
-                print(f"✓ Linked {node1_name}:{node1_port} ↔ {node2_name}:{node2_port}")
-                return link_id
-            else:
-                print(f"❌ Failed to create link: {response.status_code}")
-                return None
-                
-        except Exception as e:
-            print(f"❌ Error creating link: {e}")
-            return None
+                # Link to department switch
+                diagram_data['links'].append({
+                    'source': switch_id,
+                    'target': device_id,
+                    'type': 'access',
+                    'vlan': vlan_id
+                })
+            
+            # Store VLAN info
+            diagram_data['vlans'][vlan_id] = {
+                'name': dept_name,
+                'network': dept['network'],
+                'gateway': dept['gateway'],
+                'color': dept.get('color', '#4ECDC4')
+            }
+        
+        return diagram_data
 
-    def calculate_positions(self) -> Dict[str, Dict[str, Tuple[int, int]]]:
-        """Calculate positions for departments in circular layout"""
-        positions = {}
+    def save_all_files(self):
+        """Save all generated files"""
+        print("\n💾 Saving automation files...")
         
-        topo = self.config.get("topology", {})
-        center_x = topo.get("center_position", {}).get("x", 0)
-        center_y = topo.get("center_position", {}).get("y", 0)
-        dept_radius = topo.get("department_radius", 400)
-        device_radius = topo.get("device_radius", 120)
+        # Create output directory
+        output_dir = Path("network_automation")
+        output_dir.mkdir(exist_ok=True)
         
-        departments = self.config.get("departments", [])
-        num_depts = len(departments)
+        # Generate and save inventory
+        inventory = self.generate_network_inventory()
+        with open(output_dir / "inventory.yml", 'w') as f:
+            yaml.dump(inventory, f, default_flow_style=False, indent=2)
+        print(f"✓ Saved inventory.yml")
         
-        for i, dept in enumerate(departments):
-            angle = (2 * math.pi * i) / num_depts - (math.pi / 2)
-            dept_x = center_x + int(dept_radius * math.cos(angle))
-            dept_y = center_y + int(dept_radius * math.sin(angle))
-            
-            dept_name = dept["name"]
-            positions[dept_name] = {}
-            
-            # Switch position
-            positions[dept_name]["switch"] = (dept_x, dept_y)
-            
-            # Device positions around switch
-            devices = dept.get("devices", {})
-            total_devices = sum([
-                devices.get("pc", 0),
-                devices.get("server", 0),
-                devices.get("printer", 0)
-            ])
-            
-            device_positions = []
-            for j in range(total_devices):
-                if total_devices == 1:
-                    dev_x = dept_x
-                    dev_y = dept_y + device_radius
-                else:
-                    dev_angle = (2 * math.pi * j) / total_devices
-                    dev_x = dept_x + int(device_radius * math.cos(dev_angle))
-                    dev_y = dept_y + int(device_radius * math.sin(dev_angle))
-                device_positions.append((dev_x, dev_y))
-            
-            positions[dept_name]["devices"] = device_positions
+        # Generate and save playbooks
+        vlan_playbook = self.generate_vlan_config_playbook()
+        with open(output_dir / "configure_vlans.yml", 'w') as f:
+            f.write(vlan_playbook)
+        print(f"✓ Saved configure_vlans.yml")
         
-        return positions
+        interface_playbook = self.generate_interface_config_playbook()
+        with open(output_dir / "configure_interfaces.yml", 'w') as f:
+            f.write(interface_playbook)
+        print(f"✓ Saved configure_interfaces.yml")
+        
+        # Generate and save PC config script
+        pc_script = self.generate_pc_config_script()
+        with open(output_dir / "configure_pcs.sh", 'w') as f:
+            f.write(pc_script)
+        (output_dir / "configure_pcs.sh").chmod(0o755)  # Make executable
+        print(f"✓ Saved configure_pcs.sh")
+        
+        # Generate and save network diagram data
+        diagram_data = self.generate_network_diagram_data()
+        with open(output_dir / "network_diagram.json", 'w') as f:
+            json.dump(diagram_data, f, indent=2)
+        print(f"✓ Saved network_diagram.json")
+        
+        # Create README
+        readme_content = self.generate_readme()
+        with open(output_dir / "README.md", 'w') as f:
+            f.write(readme_content)
+        print(f"✓ Saved README.md")
+        
+        print(f"\n✅ All files saved to '{output_dir}' directory")
 
-    def build_network(self):
-        """Build the complete software company network"""
-        print(f"\n🚀 Building Software Company Network")
-        print("=" * 60)
-        
-        # Step 1: Test connection
-        if not self.test_server_connection():
-            return False
-        
-        # Step 2: Create project
-        if not self.create_new_project():
-            return False
-        
-        # Step 3: Get templates
-        if not self.get_templates():
-            return False
-        
-        # Step 4: Calculate positions
-        positions = self.calculate_positions()
-        
-        # Step 5: Create core switch
-        print(f"\n🏗️  Creating Core Infrastructure...")
-        infra = self.config.get("infrastructure", {})
-        
-        core_switch_config = infra["core_switch"]
-        pos = core_switch_config["position"]
-        
-        core_switch_id = self.create_node(
-            name=core_switch_config["name"],
-            template_type=core_switch_config["template"],
-            x=pos["x"],
-            y=pos["y"]
-        )
-        
-        if not core_switch_id:
-            print("❌ Failed to create core infrastructure")
-            return False
-        
-        self.switch_ports[core_switch_config["name"]] = 0
-        
-        # Step 6: Build departments (limited for testing)
-        print(f"\n🏢 Building Departments...")
-        departments = self.config.get("departments", [])
-        
-        # Build first 3 departments for testing
-        for dept in departments[:3]:
-            dept_name = dept["name"]
-            dept_code = dept["code"]
-            vlan_id = dept["vlan_id"]
-            
-            print(f"\n  📁 Building Department {dept_code}: {dept_name} (VLAN {vlan_id})")
-            
-            # Create department switch
-            switch_name = f"SW-{dept_code}-{dept_name}"
-            switch_pos = positions[dept_name]["switch"]
-            
-            switch_id = self.create_node(
-                name=switch_name,
-                template_type="switch",
-                x=switch_pos[0],
-                y=switch_pos[1]
-            )
-            
-            if switch_id:
-                self.switch_ports[switch_name] = 0
-                
-                # Link to core switch
-                core_port = self.switch_ports[core_switch_config["name"]]
-                self.create_link(core_switch_config["name"], core_port, switch_name, 0)
-                self.switch_ports[core_switch_config["name"]] += 1
-                self.switch_ports[switch_name] = 1
-                
-                # Create devices
-                devices = dept.get("devices", {})
-                device_positions = positions[dept_name]["devices"]
-                pos_index = 0
-                
-                # Create PCs (limit to 2 for testing)
-                num_pcs = min(devices.get("pc", 0), 2)
-                for i in range(num_pcs):
-                    if pos_index < len(device_positions):
-                        pc_name = f"PC-{dept_code}-{i+1:02d}"
-                        pos = device_positions[pos_index]
-                        
-                        pc_id = self.create_node(
-                            name=pc_name,
-                            template_type="vpcs",
-                            x=pos[0],
-                            y=pos[1]
-                        )
-                        
-                        if pc_id:
-                            switch_port = self.switch_ports[switch_name]
-                            self.create_link(switch_name, switch_port, pc_name, 0)
-                            self.switch_ports[switch_name] += 1
-                            pos_index += 1
-        
-        # Step 7: Summary
-        self.print_summary()
-        return True
+    def generate_readme(self) -> str:
+        """Generate README file"""
+        return f"""# Network Automation Files
 
-    def print_summary(self):
-        """Print build summary"""
-        print(f"\n✅ Network Build Complete!")
-        print("=" * 60)
-        print(f"📊 Build Summary:")
-        print(f"   • Project: {self.project_name}")
-        print(f"   • Project ID: {self.project_id}")
-        print(f"   • Total Nodes: {len(self.created_nodes)}")
-        print(f"   • Total Links: {len(self.created_links)}")
+This directory contains automated configuration files generated from your manual network setup.
+
+## Generated Files
+
+### 📋 Inventory
+- `inventory.yml` - Ansible inventory with all network devices
+
+### 🎛️ Playbooks
+- `configure_vlans.yml` - Configures VLANs on switches
+- `configure_interfaces.yml` - Configures switch interfaces
+
+### 🖥️ Scripts
+- `configure_pcs.sh` - Script to configure PC network settings
+
+### 📊 Documentation
+- `network_diagram.json` - Network topology data for visualization
+- `README.md` - This file
+
+## Usage
+
+### 1. Configure Switches with Ansible
+```bash
+# Install Ansible and Cisco collection
+pip install ansible
+ansible-galaxy collection install cisco.ios
+
+# Run VLAN configuration
+ansible-playbook -i inventory.yml configure_vlans.yml
+
+# Run interface configuration
+ansible-playbook -i inventory.yml configure_interfaces.yml
+```
+
+### 2. Configure PCs
+```bash
+# Make script executable and run
+chmod +x configure_pcs.sh
+./configure_pcs.sh
+```
+
+### 3. Manual GNS3 Setup
+1. Open GNS3 GUI
+2. Create a new project
+3. Add devices according to the network diagram
+4. Use the generated configurations
+
+## Network Overview
+
+**Departments:** {len(self.config.get('departments', []))}
+**VLANs configured:**
+"""
+
+    def run(self):
+        """Main execution method"""
+        print("🚀 Network Automation Generator")
+        print("=" * 50)
         
-        # Node breakdown
-        node_types = {}
-        for node_name, node_info in self.created_nodes.items():
-            node_type = node_info["type"]
-            node_types[node_type] = node_types.get(node_type, 0) + 1
+        print(f"📊 Network Overview:")
+        departments = self.config.get('departments', [])
+        print(f"  • Departments: {len(departments)}")
         
-        print(f"\n📋 Node Type Breakdown:")
-        for node_type, count in node_types.items():
-            print(f"   • {node_type.title()}: {count}")
+        total_devices = 0
+        for dept in departments:
+            devices = dept.get('devices', {})
+            dept_total = sum(devices.values())
+            total_devices += dept_total
+            print(f"  • {dept['name']}: {dept_total} devices (VLAN {dept['vlan_id']})")
+        
+        print(f"  • Total devices: {total_devices}")
+        
+        # Save all generated files
+        self.save_all_files()
+        
+        print(f"\n🎯 Next Steps:")
+        print(f"1. 📂 Check the 'network_automation' directory for generated files")
+        print(f"2. 🖥️ Create a GNS3 project manually using GNS3 GUI")
+        print(f"3. 🔧 Use the Ansible playbooks to configure your switches")
+        print(f"4. 💻 Run the PC configuration script on your endpoints")
+        print(f"5. 📊 Use network_diagram.json for network visualization")
+        
+        print(f"\n📚 Documentation:")
+        print(f"   • All files are documented in network_automation/README.md")
+        print(f"   • Inventory contains {len(departments)} department networks")
+        print(f"   • Playbooks ready for Ansible automation")
 
 def main():
-    """Main execution function"""
-    print("🌐 GNS3 Software Company Network Builder")
-    print("=" * 60)
-    
+    """Main function"""
     try:
-        # Get credentials
-        username = input("Enter GNS3 username (default: admin): ").strip() or "admin"
-        password = getpass.getpass("Enter GNS3 password (default: admin): ") or "admin"
+        generator = NetworkAutomationGenerator()
+        generator.run()
         
-        # Initialize builder
-        builder = SoftwareCompanyNetworkBuilder(
-            username=username,
-            password=password
-        )
-        
-        # Build network
-        success = builder.build_network()
-        
-        if success:
-            print(f"\n🎉 Network build completed successfully!")
-            print(f"🔗 Access your project at: {builder.server}")
-            print(f"📋 Project ID: {builder.project_id}")
-        else:
-            print(f"\n❌ Network build failed!")
-            
     except KeyboardInterrupt:
-        print(f"\n⚠ Operation cancelled by user")
+        print("\n⚠ Cancelled by user")
     except Exception as e:
-        print(f"\n❌ Critical error: {e}")
+        print(f"\n❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
