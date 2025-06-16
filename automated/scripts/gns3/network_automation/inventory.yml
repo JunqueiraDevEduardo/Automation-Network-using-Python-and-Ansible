@@ -150,38 +150,6 @@ all:
           vlan_id: 90
     servers:
       hosts:
-        Server-1-10:
-          ansible_host: 192.168.10.8
-          department: Development/Engineering
-          vlan_id: 10
-        Server-1-100:
-          ansible_host: 192.168.0.2
-          department: Infrastructure & Security
-          vlan_id: 100
-        Server-1-30:
-          ansible_host: 192.168.30.8
-          department: IT Network
-          vlan_id: 30
-        Server-2-100:
-          ansible_host: 192.168.0.3
-          department: Infrastructure & Security
-          vlan_id: 100
-        Server-3-100:
-          ansible_host: 192.168.0.4
-          department: Infrastructure & Security
-          vlan_id: 100
-        Server-4-100:
-          ansible_host: 192.168.0.5
-          department: Infrastructure & Security
-          vlan_id: 100
-        Server-5-100:
-          ansible_host: 192.168.0.6
-          department: Infrastructure & Security
-          vlan_id: 100
-        Server-6-100:
-          ansible_host: 192.168.0.7
-          department: Infrastructure & Security
-          vlan_id: 100
         server-1-70:
           ansible_host: 192.168.70.4
           department: Accounts and Finance

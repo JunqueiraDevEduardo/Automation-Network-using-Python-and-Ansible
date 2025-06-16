@@ -43,7 +43,7 @@
             name: "Marketing"
             state: active
           - vlan_id: 100
-            name: "Infrastructure-and-Security"
+            name: "Infrastructure-&-Security"
             state: active
         state: merged
         
