@@ -21,7 +21,7 @@ def generate_from_your_config():
     
     # Load your actual network configuration from YAML file
     # This reads the config/network_data.yml file with your department structure
-    with open('config/network_data.yml', 'r') as f:
+    with open('../config/network_data.yml', 'r') as f:
         config = yaml.safe_load(f)
     
     # Extract departments list from configuration
