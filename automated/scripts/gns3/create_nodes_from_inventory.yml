@@ -1,0 +1,229 @@
+---
+# GNS3 v3 API Node Creation with Authentication
+
+- name: Create GNS3 Nodes using v3 API
+  hosts: localhost
+  gather_facts: no
+  
+  vars:
+    gns3_server: "http://127.0.0.1:3080"
+    gns3_user: "admin"
+    gns3_password: "admin"
+    
+  tasks:
+    # Step 1: Authenticate and get token (if needed)
+    - name: Try to get authentication token
+      uri:
+        url: "{{ gns3_server }}/v3/access/users/authenticate"
+        method: POST
+        body_format: json
+        body:
+          username: "{{ gns3_user }}"
+          password: "{{ gns3_password }}"
+        status_code: [200, 404]
+      register: auth_response
+      ignore_errors: yes
+      
+    - name: Set authentication header
+      set_fact:
+        auth_headers:
+          Authorization: "Bearer {{ auth_response.json.access_token }}"
+      when: auth_response.status == 200 and auth_response.json.access_token is defined
+      
+    - name: Use basic auth if no token
+      set_fact:
+        auth_headers: {}
+      when: auth_headers is not defined
+      
+    # Step 2: List all projects with v3 API
+    - name: Get all projects (v3 with auth)
+      uri:
+        url: "{{ gns3_server }}/v3/projects"
+        method: GET
+        headers: "{{ auth_headers }}"
+        user: "{{ gns3_user }}"
+        password: "{{ gns3_password }}"
+        force_basic_auth: yes
+        status_code: [200, 401]
+      register: projects_v3
+      
+    - name: Display v3 projects
+      debug:
+        msg: |
+          V3 API Projects:
+          {% if projects_v3.json is defined %}
+          {% for project in projects_v3.json %}
+          - Name: {{ project.name }}
+            ID: {{ project.project_id }}
+            Status: {{ project.status }}
+          {% endfor %}
+          {% else %}
+          No projects found or authentication failed
+          {% endif %}
+          
+    # Step 3: Try v2 API as fallback
+    - name: Get all projects (v2 no auth)
+      uri:
+        url: "{{ gns3_server }}/v2/projects"
+        method: GET
+        status_code: [200, 404]
+      register: projects_v2
+      when: projects_v3.status != 200
+      
+    - name: Display v2 projects
+      debug:
+        msg: |
+          V2 API Projects:
+          {% if projects_v2.json is defined %}
+          {% for project in projects_v2.json %}
+          - Name: {{ project.name }}
+            ID: {{ project.project_id }}
+            Status: {{ project.status }}
+          {% endfor %}
+          {% else %}
+          No projects found
+          {% endif %}
+      when: projects_v2 is defined
+      
+    # Step 4: Find an open project
+    - name: Find open project from v3
+      set_fact:
+        project_info:
+          id: "{{ item.project_id }}"
+          name: "{{ item.name }}"
+          api_version: "v3"
+      loop: "{{ projects_v3.json | default([]) }}"
+      when: 
+        - projects_v3.status == 200
+        - item.status == "opened"
+        
+    - name: Find open project from v2
+      set_fact:
+        project_info:
+          id: "{{ item.project_id }}"
+          name: "{{ item.name }}"
+          api_version: "v2"
+      loop: "{{ projects_v2.json | default([]) }}"
+      when: 
+        - project_info is not defined
+        - projects_v2 is defined
+        - item.status == "opened"
+        
+    - name: Check if project found
+      fail:
+        msg: |
+          No open project found!
+          Please:
+          1. Open GNS3
+          2. Create or open a project
+          3. Keep it open
+          4. Run this playbook again
+      when: project_info is not defined
+      
+    - name: Display selected project
+      debug:
+        msg: |
+          Using project: {{ project_info.name }}
+          ID: {{ project_info.id }}
+          API Version: {{ project_info.api_version }}
+          
+    # Step 5: Load inventory
+    - name: Load inventory file
+      include_vars:
+        file: "{{ playbook_dir }}/network_automation/inventory.yml"
+        name: inventory_data
+        
+    # Step 6: Create nodes based on API version
+    - name: Create switches (v3 API)
+      uri:
+        url: "{{ gns3_server }}/v3/projects/{{ project_info.id }}/nodes"
+        method: POST
+        headers: "{{ auth_headers }}"
+        user: "{{ gns3_user }}"
+        password: "{{ gns3_password }}"
+        force_basic_auth: yes
+        body_format: json
+        body:
+          name: "{{ item.key }}"
+          node_type: "ethernet_switch"
+          compute_id: "local"
+          x: "{{ 100 + (loop.index0 * 150) }}"
+          y: 100
+        status_code: [201, 409]
+      loop: "{{ inventory_data.all.children.switches.hosts | dict2items }}"
+      when: 
+        - project_info.api_version == "v3"
+        - inventory_data.all.children.switches.hosts is defined
+      register: created_switches_v3
+      
+    - name: Create switches (v2 API)
+      uri:
+        url: "{{ gns3_server }}/v2/projects/{{ project_info.id }}/nodes"
+        method: POST
+        body_format: json
+        body:
+          name: "{{ item.key }}"
+          node_type: "ethernet_switch"
+          compute_id: "local"
+          x: "{{ 100 + (loop.index0 * 150) }}"
+          y: 100
+        status_code: [201, 409]
+      loop: "{{ inventory_data.all.children.switches.hosts | dict2items }}"
+      when: 
+        - project_info.api_version == "v2"
+        - inventory_data.all.children.switches.hosts is defined
+      register: created_switches_v2
+      
+    # Create PCs
+    - name: Create PC nodes (v3 API)
+      uri:
+        url: "{{ gns3_server }}/v3/projects/{{ project_info.id }}/nodes"
+        method: POST
+        headers: "{{ auth_headers }}"
+        user: "{{ gns3_user }}"
+        password: "{{ gns3_password }}"
+        force_basic_auth: yes
+        body_format: json
+        body:
+          name: "{{ item.key }}"
+          node_type: "vpcs"
+          compute_id: "local"
+          x: "{{ 50 + ((loop.index0 % 10) * 80) }}"
+          y: "{{ 500 + ((loop.index0 // 10) * 80) }}"
+        status_code: [201, 409]
+      loop: "{{ inventory_data.all.children.pcs.hosts | dict2items }}"
+      when: 
+        - project_info.api_version == "v3"
+        - inventory_data.all.children.pcs.hosts is defined
+      register: created_pcs_v3
+      
+    - name: Create PC nodes (v2 API)
+      uri:
+        url: "{{ gns3_server }}/v2/projects/{{ project_info.id }}/nodes"
+        method: POST
+        body_format: json
+        body:
+          name: "{{ item.key }}"
+          node_type: "vpcs"
+          compute_id: "local"
+          x: "{{ 50 + ((loop.index0 % 10) * 80) }}"
+          y: "{{ 500 + ((loop.index0 // 10) * 80) }}"
+        status_code: [201, 409]
+      loop: "{{ inventory_data.all.children.pcs.hosts | dict2items }}"
+      when: 
+        - project_info.api_version == "v2"
+        - inventory_data.all.children.pcs.hosts is defined
+      register: created_pcs_v2
+      
+    # Summary
+    - name: Display summary
+      debug:
+        msg: |
+          Node Creation Summary:
+          - Project: {{ project_info.name }} ({{ project_info.id }})
+          - API Version: {{ project_info.api_version }}
+          - Authentication: {{ 'Token' if auth_headers.Authorization is defined else 'Basic Auth' }}
+          
+          Created Nodes:
+          - Switches: {{ (created_switches_v3.results | default([]) + created_switches_v2.results | default([])) | selectattr('status', 'defined') | selectattr('status', 'in', [201, 409]) | list | length }}
+          - PCs: {{ (created_pcs_v3.results | default([]) + created_pcs_v2.results | default([])) | selectattr('status', 'defined') | selectattr('status', 'in', [201, 409]) | list | length }}

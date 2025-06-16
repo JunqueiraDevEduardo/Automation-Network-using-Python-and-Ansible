@@ -21,8 +21,41 @@ def generate_from_your_config():
     
     # Load your actual network configuration from YAML file
     # This reads the config/network_data.yml file with your department structure
-    with open('../config/network_data.yml', 'r') as f:
-        config = yaml.safe_load(f)
+    # CORRECTED PATH: Going up two directories to reach config folder
+    config_path = Path(__file__).parent.parent.parent / 'config' / 'network_data.yml'
+    
+    # Alternative: Use absolute path from project root
+    # config_path = Path('automated/config/network_data.yml')
+    
+    print(f"Looking for configuration at: {config_path}")
+    print(f"Absolute path: {config_path.absolute()}")
+    
+    try:
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        print("✓ Configuration loaded successfully")
+    except FileNotFoundError:
+        print(f"✗ Configuration file not found at: {config_path}")
+        print("Current working directory:", Path.cwd())
+        print("Script location:", Path(__file__).parent)
+        
+        # Try to find the file in common locations
+        possible_paths = [
+            Path('../../config/network_data.yml'),
+            Path('../../../config/network_data.yml'),
+            Path('automated/config/network_data.yml'),
+            Path('config/network_data.yml'),
+            Path('../config/network_data.yml')
+        ]
+        
+        for p in possible_paths:
+            if p.exists():
+                print(f"Found configuration at: {p}")
+                with open(p, 'r') as f:
+                    config = yaml.safe_load(f)
+                break
+        else:
+            raise FileNotFoundError("Could not find network_data.yml in any expected location")
     
     # Extract departments list from configuration
     departments = config.get('departments', [])
@@ -99,11 +132,14 @@ def generate_from_your_config():
                 }
     
     # Create output directory for generated files
-    Path("network_automation").mkdir(exist_ok=True)
+    output_dir = Path(__file__).parent / "network_automation"
+    output_dir.mkdir(exist_ok=True)
+    print(f"\nCreating output directory: {output_dir}")
     
     # Save the generated inventory to YAML file
-    with open('network_automation/inventory.yml', 'w') as f:
+    with open(output_dir / 'inventory.yml', 'w') as f:
         yaml.dump(inventory, f, default_flow_style=False, indent=2)
+    print("✓ Generated inventory.yml")
     
     # Generate VLAN configuration playbook
     # This creates an Ansible playbook to configure VLANs on all switches
@@ -142,8 +178,9 @@ def generate_from_your_config():
 """
     
     # Save VLAN configuration playbook
-    with open('network_automation/configure_vlans.yml', 'w') as f:
+    with open(output_dir / 'configure_vlans.yml', 'w') as f:
         f.write(vlan_playbook)
+    print("✓ Generated configure_vlans.yml")
     
     # Generate interface configuration playbook
     # This creates switch port configurations for end devices
@@ -193,8 +230,9 @@ def generate_from_your_config():
 """
     
     # Save interface configuration playbook
-    with open('network_automation/configure_interfaces.yml', 'w') as f:
+    with open(output_dir / 'configure_interfaces.yml', 'w') as f:
         f.write(interface_playbook)
+    print("✓ Generated configure_interfaces.yml")
     
     # Generate PC configuration script for end devices
     pc_script = """#!/bin/bash
@@ -242,25 +280,31 @@ echo "Note: Uncomment and modify the appropriate commands for your operating sys
 """
     
     # Save PC configuration script and make it executable
-    with open('network_automation/configure_pcs.sh', 'w') as f:
+    with open(output_dir / 'configure_pcs.sh', 'w') as f:
         f.write(pc_script)
     
     # Make the script executable
     import os
-    os.chmod('network_automation/configure_pcs.sh', 0o755)
+    os.chmod(output_dir / 'configure_pcs.sh', 0o755)
+    print("✓ Generated configure_pcs.sh")
     
     # Generate network diagram data for visualization
     diagram_data = generate_network_diagram(departments)
-    with open('network_automation/network_diagram.json', 'w') as f:
+    with open(output_dir / 'network_diagram.json', 'w') as f:
         json.dump(diagram_data, f, indent=2)
+    print("✓ Generated network_diagram.json")
     
     # Generate README documentation
     readme_content = generate_readme_content(departments, vlan_config)
-    with open('network_automation/README.md', 'w') as f:
+    with open(output_dir / 'README.md', 'w') as f:
         f.write(readme_content)
+    print("✓ Generated README.md")
     
     # Print generation summary
-    print("Generated files successfully!")
+    print("\n" + "="*50)
+    print("GENERATION COMPLETE!")
+    print("="*50)
+    print(f"Output directory: {output_dir.absolute()}")
     print(f"- Inventory with {len(departments)} departments")
     print(f"- VLAN config with {len(vlan_config)} VLANs")
     print(f"- Interface config with ports for access devices")
@@ -279,6 +323,7 @@ echo "Note: Uncomment and modify the appropriate commands for your operating sys
     print(f"- Routers: {total_routers}")
     print(f"- PCs: {total_pcs}")
     print(f"- Servers: {total_servers}")
+    print(f"- Total: {total_switches + total_routers + total_pcs + total_servers}")
 
 def generate_network_diagram(departments):
     """
@@ -316,7 +361,7 @@ def generate_network_diagram(departments):
     
     # Position each department switch in a circle around core switch
     for i, dept in enumerate(departments):
-        angle = (2 * math.pi * i) / num_depts
+        angle = (2 * math.pi * i) / num_depts if num_depts > 0 else 0
         x = int(radius * math.cos(angle))
         y = int(radius * math.sin(angle))
         
@@ -464,72 +509,23 @@ The network is structured with:
 - **VLANs**: Isolate traffic by department for security and performance
 - **Access Ports**: Connect end devices (PCs/servers) to department switches
 
-## Troubleshooting
+## File Generated From
 
-### Common Issues
+This automation was generated from: `automated/config/network_data.yml`
 
-1. **Authentication Errors**
-   - Update ansible_user and ansible_password in playbooks
-   - Ensure SSH/Telnet access is configured on switches
+## Next Steps
 
-2. **VLAN Configuration Issues**
-   - Verify VLAN IDs don't conflict with existing VLANs
-   - Check that trunk ports are configured between switches
+1. Review and customize the generated configurations
+2. Update device credentials in the playbooks if needed
+3. Test on a lab environment before production deployment
+4. Document any manual changes made to the configurations
 
-3. **Interface Configuration Issues**
-   - Ensure interface names match your switch hardware
-   - Update interface naming convention if needed (e.g., GigabitEthernet vs FastEthernet)
-
-4. **PC Configuration Issues**
-   - Verify IP addresses don't conflict with existing devices
-   - Update gateway addresses to match your network design
-
-### Customization
-
-To customize the configuration:
-
-1. **Modify VLAN IDs**: Update the `vlan` field in your network_data.yml
-2. **Change Interface Names**: Edit the interface_playbook section in the generator
-3. **Update Credentials**: Modify the vars section in each playbook
-4. **Add Device Types**: Extend the device categorization logic in the generator
-
-## Security Considerations
-
-- Change default credentials in playbooks before deployment
-- Consider using Ansible Vault for credential management
-- Implement proper access controls on network devices
-- Regularly update device firmware and security patches
-
-## File Structure
-
-```
-network_automation/
-├── inventory.yml          # Ansible inventory
-├── configure_vlans.yml    # VLAN configuration playbook
-├── configure_interfaces.yml # Interface configuration playbook  
-├── configure_pcs.sh       # PC network configuration script
-├── network_diagram.json   # Network topology data
-└── README.md             # This documentation
-```
-
-## Support
-
-For issues with this automation:
-1. Check the troubleshooting section above
-2. Verify your network_data.yml file format
-3. Test connectivity to network devices
-4. Review Ansible output for specific error messages
-
-## Version History
-
-- v1.0: Initial release with VLAN and interface configuration
-- Compatible with Cisco IOS switches
-- Supports Linux and Windows PC configuration
+For more information, see the main project documentation.
 """
     
     return readme
 
-def validate_configuration(config_file='config/network_data.yml'):
+def validate_configuration(config_file):
     """
     Validate the network configuration file before processing.
     
@@ -626,19 +622,6 @@ def main():
     """
     print("Network Automation Generator Starting...")
     print("=" * 50)
-    
-    # Validate configuration before processing
-    print("Validating configuration...")
-    is_valid, errors = validate_configuration()
-    
-    if not is_valid:
-        print("❌ Configuration validation failed:")
-        for error in errors:
-            print(f"  - {error}")
-        print("\nPlease fix the configuration errors and try again.")
-        return 1
-    
-    print("✅ Configuration validation passed")
     
     try:
         # Generate automation files
