@@ -1,0 +1,14 @@
+{
+  "nodes": [
+    {
+      "id": "CoreSwitch",
+      "label": "Core Switch",
+      "type": "switch",
+      "x": 0,
+      "y": 0,
+      "color": "#FF6B6B"
+    }
+  ],
+  "links": [],
+  "vlans": {}
+}

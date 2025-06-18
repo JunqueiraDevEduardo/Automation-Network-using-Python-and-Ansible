@@ -15,36 +15,6 @@
     - name: Configure VLANs
       cisco.ios.ios_vlans:
         config:
-          - vlan_id: 10
-            name: "Development-Engineering"
-            state: active
-          - vlan_id: 20
-            name: "Guest-Network"
-            state: active
-          - vlan_id: 30
-            name: "IT-Network"
-            state: active
-          - vlan_id: 40
-            name: "Sales-and-Marketing"
-            state: active
-          - vlan_id: 50
-            name: "Admin-Department"
-            state: active
-          - vlan_id: 60
-            name: "Human-Resource-Management"
-            state: active
-          - vlan_id: 70
-            name: "Accounts-and-Finance"
-            state: active
-          - vlan_id: 80
-            name: "Design"
-            state: active
-          - vlan_id: 90
-            name: "Marketing"
-            state: active
-          - vlan_id: 100
-            name: "Infrastructure-&-Security"
-            state: active
         state: merged
         
     - name: Save configuration
