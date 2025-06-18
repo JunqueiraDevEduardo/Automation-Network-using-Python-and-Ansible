@@ -1,28 +1,32 @@
 ---
-# GNS3 v3 API Node Creation Tasks
-# Creates network nodes (switches, routers, PCs) in GNS3 project
-# Uses OAuth2 authentication inherited from parent playbook
+# Create all network nodes (switches, routers, PCs) in GNS3 using v3 API
+# This playbook creates nodes from the network configuration
 
-# Check if we have authentication headers from parent playbook
+# Verify we have authentication from parent playbook
 - name: Verify authentication headers exist
   fail:
     msg: "No authentication headers found. This playbook should be called from deploy_complete_network.yml"
   when: auth_headers is not defined
-  
-# Load the network configuration from the config directory
+
+# Load network configuration
 - name: Load network configuration
   include_vars:
     file: "{{ playbook_dir }}/network_data.yml"
     name: network_config
-  
-# Display loaded configuration summary
+
+# Display configuration summary
 - name: Display configuration summary
   debug:
     msg: |
       Loaded network configuration:
       - Departments: {{ network_config.departments | length }}
       - Total devices: {{ network_config.departments | map(attribute='devices') | flatten | length }}
-      
+
+# Flatten all devices from all departments for easier processing
+- name: Create flattened device list
+  set_fact:
+    all_devices: "{{ network_config.departments | map(attribute='devices') | flatten }}"
+
 # Create all switches from the network configuration
 - name: Create switches
   uri:
@@ -31,120 +35,127 @@
     headers: "{{ auth_headers }}"
     body_format: json
     body:
-      name: "{{ device.name }}"
+      name: "{{ item.name }}"
       node_type: "ethernet_switch"
       compute_id: "local"
-      # Position switches in a grid layout
-      x: "{{ -300 + (dept_index * 200) }}"
-      y: "{{ -200 if device.name == 'CoreSwitch' else 0 }}"
+      x: "{{ 100 + (switch_index * 150) }}"
+      y: "{{ 100 + ((switch_index // 10) * 100) }}"
       properties:
         ports_mapping:
           - name: "Ethernet0"
             port_number: 0
-            type: "ethernet"
-          - name: "Ethernet1"
+          - name: "Ethernet1" 
             port_number: 1
-            type: "ethernet"
           - name: "Ethernet2"
             port_number: 2
-            type: "ethernet"
           - name: "Ethernet3"
             port_number: 3
-            type: "ethernet"
           - name: "Ethernet4"
             port_number: 4
-            type: "ethernet"
           - name: "Ethernet5"
             port_number: 5
-            type: "ethernet"
           - name: "Ethernet6"
             port_number: 6
-            type: "ethernet"
           - name: "Ethernet7"
             port_number: 7
-            type: "ethernet"
     status_code: [201, 409]  # 409 if node already exists
-  loop: "{{ network_config.departments | subelements('devices') }}"
+  loop: "{{ all_devices | selectattr('type', 'equalto', 'switch') | list }}"
   loop_control:
-    index_var: device_index
-    loop_var: item
-  vars:
-    dept: "{{ item.0 }}"
-    device: "{{ item.1 }}"
-    dept_index: "{{ loop.index0 // 10 }}"
-  when: device.type == "switch"
-  register: created_switches
-  
-# Create all routers from the network configuration
-- name: Create routers
+    index_var: switch_index
+  register: switch_results
+
+# Create all routers using VPCS (Virtual PC Simulator) as lightweight routers
+- name: Create routers (using VPCS)
   uri:
     url: "{{ gns3_server }}/v3/projects/{{ project_id }}/nodes"
     method: POST
     headers: "{{ auth_headers }}"
     body_format: json
     body:
-      name: "{{ device.name }}"
-      node_type: "vpcs"  # Using VPCS as simple router substitute
-      compute_id: "local"
-      # Position routers near their department switches
-      x: "{{ -300 + (dept_index * 200) }}"
-      y: "{{ 100 }}"
-    status_code: [201, 409]
-  loop: "{{ network_config.departments | subelements('devices') }}"
-  loop_control:
-    index_var: device_index
-    loop_var: item
-  vars:
-    dept: "{{ item.0 }}"
-    device: "{{ item.1 }}"
-    dept_index: "{{ loop.index0 // 10 }}"
-  when: device.type == "router"
-  register: created_routers
-  
-# Create all PCs and servers from the network configuration
-- name: Create PCs and servers
-  uri:
-    url: "{{ gns3_server }}/v3/projects/{{ project_id }}/nodes"
-    method: POST
-    headers: "{{ auth_headers }}"
-    body_format: json
-    body:
-      name: "{{ device.name }}"
+      name: "{{ item.name }}"
       node_type: "vpcs"
       compute_id: "local"
-      # Position PCs in rows below their department
-      x: "{{ -350 + (dept_index * 200) + ((device_in_dept_index % 3) * 50) }}"
-      y: "{{ 200 + ((device_in_dept_index // 3) * 50) }}"
+      x: "{{ 300 + (router_index * 150) }}"
+      y: "{{ 200 + ((router_index // 10) * 100) }}"
+      properties: {}
     status_code: [201, 409]
-  loop: "{{ network_config.departments | subelements('devices') }}"
+  loop: "{{ all_devices | selectattr('type', 'equalto', 'router') | list }}"
   loop_control:
-    index_var: device_index
-    loop_var: item
-  vars:
-    dept: "{{ item.0 }}"
-    device: "{{ item.1 }}"
-    dept_index: "{{ loop.index0 // 10 }}"
-    # Calculate position within department
-    device_in_dept_index: >-
-      {{ dept.devices | selectattr('type', 'in', ['pc']) | 
-         list | map(attribute='name') | list | index(device.name) }}
-  when: device.type == "pc" or "server" in device.name.lower() or "printer" in device.name.lower()
-  register: created_pcs
-  
+    index_var: router_index
+  register: router_results
+
+# Create all PCs using VPCS
+- name: Create PCs
+  uri:
+    url: "{{ gns3_server }}/v3/projects/{{ project_id }}/nodes"
+    method: POST
+    headers: "{{ auth_headers }}"
+    body_format: json
+    body:
+      name: "{{ item.name }}"
+      node_type: "vpcs"
+      compute_id: "local"
+      x: "{{ 500 + (pc_index * 120) }}"
+      y: "{{ 300 + ((pc_index // 10) * 100) }}"
+      properties: {}
+    status_code: [201, 409]
+  loop: "{{ all_devices | selectattr('type', 'equalto', 'pc') | list }}"
+  loop_control:
+    index_var: pc_index
+  register: pc_results
+
+# Create server nodes (using VPCS for simplicity, could be switches if needed)
+- name: Create servers/printers (devices with 'server' or 'printer' in name)
+  uri:
+    url: "{{ gns3_server }}/v3/projects/{{ project_id }}/nodes"
+    method: POST
+    headers: "{{ auth_headers }}"
+    body_format: json
+    body:
+      name: "{{ item.name }}"
+      node_type: "vpcs"
+      compute_id: "local"
+      x: "{{ 700 + (server_index * 120) }}"
+      y: "{{ 400 + ((server_index // 10) * 100) }}"
+      properties: {}
+    status_code: [201, 409]
+  loop: "{{ all_devices | selectattr('name', 'match', '.*[Ss]erver.*|.*[Pp]rinter.*') | list }}"
+  loop_control:
+    index_var: server_index
+  register: server_results
+
+# Wait for all nodes to be created
+- name: Wait for nodes to be ready
+  pause:
+    seconds: 5
+
 # Display creation summary
-- name: Display node creation summary
+- name: Display nodes creation summary
   debug:
     msg: |
-      Node Creation Summary:
-      - Switches created: {{ created_switches.results | selectattr('status', 'defined') | 
-                           selectattr('status', '==', 201) | list | length }}
-      - Routers created: {{ created_routers.results | selectattr('status', 'defined') | 
-                           selectattr('status', '==', 201) | list | length }}
-      - PCs/Servers created: {{ created_pcs.results | selectattr('status', 'defined') | 
-                               selectattr('status', '==', 201) | list | length }}
+      Nodes Creation Summary:
+      ======================
+      Switches: 
+        - Attempted: {{ switch_results.results | length }}
+        - Created: {{ switch_results.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
+        - Already existed: {{ switch_results.results | selectattr('status', 'defined') | selectattr('status', '==', 409) | list | length }}
       
-      Total new nodes: {{ (created_switches.results + created_routers.results + created_pcs.results) | 
-                         selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
+      Routers:
+        - Attempted: {{ router_results.results | length }}
+        - Created: {{ router_results.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
+        - Already existed: {{ router_results.results | selectattr('status', 'defined') | selectattr('status', '==', 409) | list | length }}
       
-      Nodes that already existed (409 status): {{ (created_switches.results + created_routers.results + created_pcs.results) | 
-                                                  selectattr('status', 'defined') | selectattr('status', '==', 409) | list | length }}
+      PCs:
+        - Attempted: {{ pc_results.results | length }}
+        - Created: {{ pc_results.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
+        - Already existed: {{ pc_results.results | selectattr('status', 'defined') | selectattr('status', '==', 409) | list | length }}
+      
+      Servers/Printers:
+        - Attempted: {{ server_results.results | length }}
+        - Created: {{ server_results.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
+        - Already existed: {{ server_results.results | selectattr('status', 'defined') | selectattr('status', '==', 409) | list | length }}
+      
+      Total nodes created: {{ 
+        (switch_results.results + router_results.results + pc_results.results + server_results.results) | 
+        selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length 
+      }}

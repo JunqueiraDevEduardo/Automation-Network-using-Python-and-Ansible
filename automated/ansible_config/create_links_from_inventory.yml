@@ -35,8 +35,59 @@
     msg: "Available nodes: {{ nodes_dict.keys() | list | sort }}"
     verbosity: 1
 
-# Create links between PCs/Servers and their department switches
-- name: Create PC/Server to Switch links
+# Create CoreSwitch first if it doesn't exist
+- name: Create CoreSwitch
+  uri:
+    url: "{{ gns3_server }}/v3/projects/{{ project_id }}/nodes"
+    method: POST
+    headers: "{{ auth_headers }}"
+    body_format: json
+    body:
+      name: "CoreSwitch"
+      node_type: "ethernet_switch"
+      compute_id: "local"
+      x: 400
+      y: 50
+      properties:
+        ports_mapping:
+          - name: "Ethernet0"
+            port_number: 0
+          - name: "Ethernet1"
+            port_number: 1
+          - name: "Ethernet2" 
+            port_number: 2
+          - name: "Ethernet3"
+            port_number: 3
+          - name: "Ethernet4"
+            port_number: 4
+          - name: "Ethernet5"
+            port_number: 5
+          - name: "Ethernet6"
+            port_number: 6
+          - name: "Ethernet7"
+            port_number: 7
+          - name: "Ethernet8"
+            port_number: 8
+          - name: "Ethernet9"
+            port_number: 9
+    status_code: [201, 409]
+  register: core_switch_result
+
+# Update nodes dictionary with CoreSwitch
+- name: Get updated nodes list
+  uri:
+    url: "{{ gns3_server }}/v3/projects/{{ project_id }}/nodes"
+    method: GET
+    headers: "{{ auth_headers }}"
+  register: all_nodes_updated
+
+- name: Update nodes lookup dictionary
+  set_fact:
+    nodes_dict: "{{ nodes_dict | default({}) | combine({item.name: item}) }}"
+  loop: "{{ all_nodes_updated.json }}"
+
+# Create links between PCs/Servers/Printers and their department switches
+- name: Create PC/Server/Printer to Switch links
   uri:
     url: "{{ gns3_server }}/v3/projects/{{ project_id }}/links"
     method: POST
@@ -44,33 +95,32 @@
     body_format: json
     body:
       nodes:
-        # PC/Server connection (always use port 0)
+        # PC/Server/Printer connection (always use port 0)
         - node_id: "{{ nodes_dict[device.name].node_id }}"
           adapter_number: 0
           port_number: 0
         # Switch connection (use incrementing ports)
         - node_id: "{{ nodes_dict[dept_switch.name].node_id }}"
           adapter_number: 0
-          port_number: "{{ pc_port_number }}"
+          port_number: "{{ device_port_number }}"
     status_code: [201, 409]  # 409 if link already exists
   loop: "{{ network_config.departments | subelements('devices') }}"
   loop_control:
-    index_var: link_index
     loop_var: item
   vars:
     dept: "{{ item.0 }}"
     device: "{{ item.1 }}"
-    # Find the department switch (not server switches)
+    # Find the main department switch (not server switches)
     dept_switch: >-
       {{ dept.devices | selectattr('type', 'equalto', 'switch') | 
          rejectattr('name', 'match', '[Ss]erver.*') | list | first }}
-    # Calculate port number for this PC on the switch
-    pc_devices: >-
+    # Calculate port number for this device on the switch (PCs, servers, printers)
+    connected_devices: >-
       {{ dept.devices | selectattr('type', 'in', ['pc']) | list +
          dept.devices | selectattr('name', 'match', '.*[Ss]erver.*') | list +
          dept.devices | selectattr('name', 'match', '.*[Pp]rinter.*') | list }}
-    pc_port_number: >-
-      {{ pc_devices | map(attribute='name') | list | index(device.name) + 1 }}
+    device_port_number: >-
+      {{ connected_devices | map(attribute='name') | list | index(device.name) + 1 }}
   when: 
     - device.type in ['pc'] or 'server' in device.name.lower() or 'printer' in device.name.lower()
     - device.name in nodes_dict
@@ -86,11 +136,11 @@
     body_format: json
     body:
       nodes:
-        # Switch uplink port (use last port)
+        # Switch uplink port (use port 7 as uplink)
         - node_id: "{{ nodes_dict[dept_switch.name].node_id }}"
           adapter_number: 0
-          port_number: 7  # Using port 7 as uplink
-        # Router port
+          port_number: 7
+        # Router port (VPCS only has one interface - port 0)
         - node_id: "{{ nodes_dict[dept_router.name].node_id }}"
           adapter_number: 0
           port_number: 0
@@ -120,10 +170,10 @@
     body_format: json
     body:
       nodes:
-        # Router uplink port
+        # Router interface (VPCS limitation - need different approach)
         - node_id: "{{ nodes_dict[dept_router.name].node_id }}"
           adapter_number: 0
-          port_number: 0  # Note: VPCS only has one interface
+          port_number: 0
         # Core switch port
         - node_id: "{{ nodes_dict['CoreSwitch'].node_id }}"
           adapter_number: 0
@@ -139,7 +189,8 @@
   when: 
     - "'CoreSwitch' in nodes_dict"
     - dept_router.name is defined and dept_router.name in nodes_dict
-    - dept.name == 'Development/Engineering'  # Only connect Dev dept to core for VPCS limitation
+    # Limit connections due to VPCS limitations - only connect first few departments
+    - dept_index < 5
   register: core_links
   
 # Display link creation summary
@@ -148,7 +199,7 @@
     msg: |
       Links Creation Summary:
       =====================
-      PC/Server to Switch links: 
+      PC/Server/Printer to Switch links: 
         - Attempted: {{ pc_links.results | length }}
         - Created: {{ pc_links.results | selectattr('status', 'defined') | 
                      selectattr('status', '==', 201) | list | length }}
@@ -171,3 +222,6 @@
       
       Total links created: {{ (pc_links.results + switch_router_links.results + core_links.results) | 
                              selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
+
+      Note: Due to VPCS limitations, only the first 5 departments are connected to CoreSwitch.
+      For a full production setup, consider using Cisco IOSv routers instead of VPCS.
