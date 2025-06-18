@@ -1,0 +1,93 @@
+---
+# Playbook  for the automated deploy of the network
+- name: Complete Network Deployment
+  hosts: localhost
+  gather_facts: no
+  
+  vars:
+    gns3_server: "http://127.0.0.1:3080"
+    gns3_user: "admin"
+    gns3_password: "admin"
+    project_id: "9a8ab49a-6f61-4fa8-9089-99e6c6594e4f"
+    
+  tasks:
+    - name: "Phase 1: Verify GNS3 connectivity"
+      uri:
+        url: "{{ gns3_server }}/v2/version"
+        method: GET
+        user: "{{ gns3_user }}"
+        password: "{{ gns3_password }}"
+        force_basic_auth: yes
+      register: gns3_version
+      
+    - name: Display GNS3 version
+      debug:
+        msg: "Connected to GNS3 Server version: {{ gns3_version.json.version }}"
+        
+    - name: "Phase 2: Verify project exists"
+      uri:
+        url: "{{ gns3_server }}/v2/projects/{{ project_id }}"
+        method: GET
+        user: "{{ gns3_user }}"
+        password: "{{ gns3_password }}"
+        force_basic_auth: yes
+      register: project_info
+      
+    - name: Display project info
+      debug:
+        msg: "Project '{{ project_info.json.name }}' is {{ project_info.json.status }}"
+        
+    - name: "Phase 3: Open project if needed"
+      uri:
+        url: "{{ gns3_server }}/v2/projects/{{ project_id }}/open"
+        method: POST
+        user: "{{ gns3_user }}"
+        password: "{{ gns3_password }}"
+        force_basic_auth: yes
+        status_code: [200, 201]
+      when: project_info.json.status != "opened"
+      
+    - name: Wait for project to be ready
+      pause:
+        seconds: 3
+        
+    - name: "Phase 4: Create nodes"
+      include: create_nodes.yml
+      
+    - name: Wait for nodes to be created
+      pause:
+        seconds: 5
+        
+    - name: "Phase 5: Create links"
+      include: create_links.yml
+      
+    - name: Wait for links to be established
+      pause:
+        seconds: 3
+        
+    - name: "Phase 6: Configure VLANs"
+      include: configure_vlans.yml
+      
+    - name: "Phase 7: Configure interfaces"
+      include: configure_interfaces.yml
+      
+    - name: "Phase 8: Final verification"
+      uri:
+        url: "{{ gns3_server }}/v2/projects/{{ project_id }}/nodes"
+        method: GET
+        user: "{{ gns3_user }}"
+        password: "{{ gns3_password }}"
+        force_basic_auth: yes
+      register: final_nodes
+      
+    - name: Display deployment summary
+      debug:
+        msg: |
+          DEPLOYMENT COMPLETE! 
+          
+          Network Summary:
+          - Total Nodes: {{ final_nodes.json | length }}
+          - Switches: {{ final_nodes.json | selectattr('node_type', 'equalto', 'ethernet_switch') | list | length }}
+          - Routers: {{ final_nodes.json | selectattr('node_type', 'match', '.*router.*|.*dynamips.*') | list | length }}
+          - PCs: {{ final_nodes.json | selectattr('node_type', 'equalto', 'vpcs') | list | length }}
+          

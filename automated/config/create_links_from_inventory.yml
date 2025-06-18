@@ -1,0 +1,155 @@
+---
+# Playbook para criar links entre nodes no GNS3
+- name: Create Network Links in GNS3
+  hosts: localhost
+  gather_facts: no
+  
+  vars:
+    gns3_server: "http://127.0.0.1:3080"
+    gns3_user: "admin"
+    gns3_password: "admin"
+    project_id: "9a8ab49a-6f61-4fa8-9089-99e6c6594e4f"
+    
+  tasks:
+    # Obter lista de todos os nodes do projeto
+    - name: Get all project nodes
+      uri:
+        url: "{{ gns3_server }}/v2/projects/{{ project_id }}/nodes"
+        method: GET
+        user: "{{ gns3_user }}"
+        password: "{{ gns3_password }}"
+        force_basic_auth: yes
+      register: all_nodes
+      
+    # Criation nodes
+    - name: Create nodes lookup dictionary
+      set_fact:
+        nodes_dict: "{{ nodes_dict | default({}) | combine({item.name: item}) }}"
+      loop: "{{ all_nodes.json }}"
+      
+    # Carregar configuração de rede
+    - name: Load network configuration
+      include_vars:
+        file: "../../config/network_data.yml"
+        name: network_config
+    
+    # Criation links  (PCs/Servers -> Switches)
+    - name: Create departmental links
+      uri:
+        url: "{{ gns3_server }}/v2/projects/{{ project_id }}/links"
+        method: POST
+        user: "{{ gns3_user }}"
+        password: "{{ gns3_password }}"
+        force_basic_auth: yes
+        body_format: json
+        body:
+          nodes:
+            - node_id: "{{ nodes_dict[device.name].node_id }}"
+              adapter_number: 0
+              port_number: 0
+            - node_id: "{{ nodes_dict[dept_switch_name].node_id }}"
+              adapter_number: 0
+              port_number: "{{ port_number }}"
+        status_code: [201, 409]
+      vars:
+        # Encontrar o switch do departamento
+        dept_switch_name: >-
+          {{ 
+            (dept.devices | selectattr('type', 'equalto', 'switch') | 
+             rejectattr('name', 'match', 'Server.*') | list | first).name 
+          }}
+        port_number: "{{ loop.index0 + 1 }}"
+      loop: >-
+        {{ 
+          dept.devices | selectattr('type', 'in', ['pc']) | list +
+          dept.devices | selectattr('name', 'match', '.*server.*') | list +
+          dept.devices | selectattr('name', 'match', '.*printer.*') | list
+        }}
+      loop_control:
+        loop_var: device
+        extended: yes
+      with_items: "{{ network_config.departments }}"
+      loop_control:
+        loop_var: dept
+      when: 
+        - device.name in nodes_dict
+        - dept_switch_name in nodes_dict
+      register: departmental_links
+      
+    # Criation links  (Switches -> Core/Routers)
+    - name: Create inter-departmental links
+      uri:
+        url: "{{ gns3_server }}/v2/projects/{{ project_id }}/links"
+        method: POST
+        user: "{{ gns3_user }}"
+        password: "{{ gns3_password }}"
+        force_basic_auth: yes
+        body_format: json
+        body:
+          nodes:
+            - node_id: "{{ nodes_dict[dept_switch.name].node_id }}"
+              adapter_number: 0
+              port_number: 0  # Port uplink
+            - node_id: "{{ nodes_dict[dept_router.name].node_id }}"
+              adapter_number: 0
+              port_number: 0
+        status_code: [201, 409]
+      vars:
+        dept_switch: >-
+          {{ 
+            dept.devices | selectattr('type', 'equalto', 'switch') | 
+            rejectattr('name', 'match', 'Server.*') | list | first 
+          }}
+        dept_router: >-
+          {{ 
+            dept.devices | selectattr('type', 'equalto', 'router') | list | first 
+          }}
+      loop: "{{ network_config.departments }}"
+      loop_control:
+        loop_var: dept
+      when: 
+        - (dept.devices | selectattr('type', 'equalto', 'switch') | rejectattr('name', 'match', 'Server.*') | list | length) > 0
+        - (dept.devices | selectattr('type', 'equalto', 'router') | list | length) > 0
+        - dept_switch.name in nodes_dict
+        - dept_router.name in nodes_dict
+      register: interdept_links
+      
+    #  link  (Core Switch)
+    - name: Create core infrastructure links
+      uri:
+        url: "{{ gns3_server }}/v2/projects/{{ project_id }}/links"
+        method: POST
+        user: "{{ gns3_user }}"
+        password: "{{ gns3_password }}"
+        force_basic_auth: yes
+        body_format: json
+        body:
+          nodes:
+            - node_id: "{{ nodes_dict['CoreSwitch'].node_id }}"
+              adapter_number: 0
+              port_number: "{{ loop.index0 }}"
+            - node_id: "{{ nodes_dict[dept_router.name].node_id }}"
+              adapter_number: 0
+              port_number: 1  # Segunda porta do router
+        status_code: [201, 409]
+      vars:
+        dept_router: >-
+          {{ 
+            dept.devices | selectattr('type', 'equalto', 'router') | list | first 
+          }}
+      loop: "{{ network_config.departments }}"
+      loop_control:
+        loop_var: dept
+      when: 
+        - 'CoreSwitch' in nodes_dict
+        - (dept.devices | selectattr('type', 'equalto', 'router') | list | length) > 0
+        - dept_router.name in nodes_dict
+      register: core_links
+      
+    - name: Display links summary
+      debug:
+        msg: |
+          Links Created:
+          - Departmental Links: {{ departmental_links.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
+          - Inter-departmental Links: {{ interdept_links.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
+          - Core Links: {{ core_links.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}

@@ -1,3 +1,5 @@
+---
+# network configuration data all mannual configuration here !
 departments:
 - name: Development/Engineering
   vlan: 10
