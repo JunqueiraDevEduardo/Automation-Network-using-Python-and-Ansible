@@ -1,33 +1,40 @@
 ---
 # Create all network nodes (switches, routers, PCs) in GNS3 using v3 API
-# This playbook creates nodes from the network configuration
 
-# Verify we have authentication from parent playbook
+# Ensure authentication headers are present
 - name: Verify authentication headers exist
   fail:
     msg: "No authentication headers found. This playbook should be called from deploy_complete_network.yml"
   when: auth_headers is not defined
 
-# Load network configuration
+# Load network configuration from YAML file
 - name: Load network configuration
   include_vars:
     file: "{{ playbook_dir }}/network_data.yml"
     name: network_config
-
-# Display configuration summary
-- name: Display configuration summary
-  debug:
-    msg: |
-      Loaded network configuration:
-      - Departments: {{ network_config.departments | length }}
-      - Total devices: {{ network_config.departments | map(attribute='devices') | flatten | length }}
 
 # Flatten all devices from all departments for easier processing
 - name: Create flattened device list
   set_fact:
     all_devices: "{{ network_config.departments | map(attribute='devices') | flatten }}"
 
-# Create all switches from the network configuration
+# Build a mapping of switch names to their department VLANs
+- name: Build switch-to-vlan mapping
+  set_fact:
+    switch_vlan_map: >-
+      {{
+        switch_vlan_map | default({}) | combine(
+          dict(
+            dept.devices | selectattr('type', 'equalto', 'switch') | map(attribute='name') | list
+            | zip([dept.vlan] * (dept.devices | selectattr('type', 'equalto', 'switch') | list | length))
+          )
+        )
+      }}
+  loop: "{{ network_config.departments }}"
+  loop_control:
+    loop_var: dept
+
+# Create all switches with required port fields
 - name: Create switches
   uri:
     url: "{{ gns3_server }}/v3/projects/{{ project_id }}/nodes"
@@ -41,30 +48,24 @@
       x: "{{ 100 + (switch_index * 150) }}"
       y: "{{ 100 + ((switch_index // 10) * 100) }}"
       properties:
-        ports_mapping:
-          - name: "Ethernet0"
-            port_number: 0
-          - name: "Ethernet1" 
-            port_number: 1
-          - name: "Ethernet2"
-            port_number: 2
-          - name: "Ethernet3"
-            port_number: 3
-          - name: "Ethernet4"
-            port_number: 4
-          - name: "Ethernet5"
-            port_number: 5
-          - name: "Ethernet6"
-            port_number: 6
-          - name: "Ethernet7"
-            port_number: 7
-    status_code: [201, 409]  # 409 if node already exists
+        ports_mapping: >-
+          [
+            {% for i in range(8) %}
+            {
+              "name": "Ethernet{{ i }}",
+              "port_number": {{ i }},
+              "type": "access",
+              "vlan": {{ switch_vlan_map[item.name] }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+          ]
+    status_code: [201, 409]
   loop: "{{ all_devices | selectattr('type', 'equalto', 'switch') | list }}"
   loop_control:
     index_var: switch_index
   register: switch_results
 
-# Create all routers using VPCS (Virtual PC Simulator) as lightweight routers
+# Create all routers using VPCS
 - name: Create routers (using VPCS)
   uri:
     url: "{{ gns3_server }}/v3/projects/{{ project_id }}/nodes"
@@ -104,7 +105,7 @@
     index_var: pc_index
   register: pc_results
 
-# Create server nodes (using VPCS for simplicity, could be switches if needed)
+# Create server/printer nodes (using VPCS)
 - name: Create servers/printers (devices with 'server' or 'printer' in name)
   uri:
     url: "{{ gns3_server }}/v3/projects/{{ project_id }}/nodes"
@@ -135,27 +136,23 @@
     msg: |
       Nodes Creation Summary:
       ======================
-      Switches: 
-        - Attempted: {{ switch_results.results | length }}
-        - Created: {{ switch_results.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
-        - Already existed: {{ switch_results.results | selectattr('status', 'defined') | selectattr('status', '==', 409) | list | length }}
-      
+      Switches:
+      - Attempted: {{ switch_results.results | length }}
+      - Created: {{ switch_results.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
+      - Already existed: {{ switch_results.results | selectattr('status', 'defined') | selectattr('status', '==', 409) | list | length }}
       Routers:
-        - Attempted: {{ router_results.results | length }}
-        - Created: {{ router_results.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
-        - Already existed: {{ router_results.results | selectattr('status', 'defined') | selectattr('status', '==', 409) | list | length }}
-      
+      - Attempted: {{ router_results.results | length }}
+      - Created: {{ router_results.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
+      - Already existed: {{ router_results.results | selectattr('status', 'defined') | selectattr('status', '==', 409) | list | length }}
       PCs:
-        - Attempted: {{ pc_results.results | length }}
-        - Created: {{ pc_results.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
-        - Already existed: {{ pc_results.results | selectattr('status', 'defined') | selectattr('status', '==', 409) | list | length }}
-      
+      - Attempted: {{ pc_results.results | length }}
+      - Created: {{ pc_results.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
+      - Already existed: {{ pc_results.results | selectattr('status', 'defined') | selectattr('status', '==', 409) | list | length }}
       Servers/Printers:
-        - Attempted: {{ server_results.results | length }}
-        - Created: {{ server_results.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
-        - Already existed: {{ server_results.results | selectattr('status', 'defined') | selectattr('status', '==', 409) | list | length }}
-      
-      Total nodes created: {{ 
-        (switch_results.results + router_results.results + pc_results.results + server_results.results) | 
-        selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length 
+      - Attempted: {{ server_results.results | length }}
+      - Created: {{ server_results.results | selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
+      - Already existed: {{ server_results.results | selectattr('status', 'defined') | selectattr('status', '==', 409) | list | length }}
+      Total nodes created: {{
+        (switch_results.results + router_results.results + pc_results.results + server_results.results) |
+        selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length
       }}
