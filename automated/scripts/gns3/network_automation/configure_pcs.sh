@@ -2,7 +2,7 @@
 # PC Network Configuration Script
 # Generated for your network topology
 
-echo "🖥️  Configuring PC Network Settings..."
+echo "Configuring PC Network Settings..."
 
 
 # Development/Engineering Department (VLAN 10)
@@ -442,5 +442,5 @@ echo "  Setting up Server-6-100: 192.168.0.7"
 # netsh interface ip set address "Ethernet" static 192.168.0.7 255.255.255.0 192.168.0.1
 # netsh interface ip set dns "Ethernet" static 8.8.8.8
 
-echo "✅ PC configuration completed!"
-echo "💡 Uncomment the appropriate commands for your operating system"
+echo "PC configuration completed!"
+echo "Uncomment the appropriate commands for your operating system"

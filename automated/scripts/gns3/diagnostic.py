@@ -1,19 +1,17 @@
-#!/usr/bin/env python3
 """
-GNS3 Network Automation Manager
-Professional API client for GNS3 v3 controller with authentication and project management.
+GNS3 Network Diagnostic:
+All HTTP codes are here:https://umbraco.com/knowledge-base/http-status-codes/
 
-This module provides a complete interface for:
-- Authentication with GNS3 v3 API using OAuth2 Password Bearer flow
-- Project creation, management, and manipulation
-- Node creation and network topology building
-- Template management and device provisioning
+This file adiagnostic.py provides a complete interface for:
+- Authentication with GNS3 v3 API using OAuth2 Password Bearer flow.
+- Project creation, management, and manipulation.
+- Node creation and network topology building.
+- Template management and device provisioning.
 
-Author: University Network Automation Project
-Version: 1.0
-Dependencies: requests, json, pathlib
 """
-
+##################################
+#Imports
+##################################
 import requests
 import json
 import yaml
@@ -27,15 +25,6 @@ logger = logging.getLogger(__name__)
 
 class GNS3NetworkManager:
     """
-    Professional GNS3 API manager class providing comprehensive network automation capabilities.
-    
-    This class handles all aspects of GNS3 interaction including:
-    - Authentication and session management
-    - Project lifecycle management
-    - Network topology creation and modification
-    - Device template management
-    - Network configuration deployment
-    
     Attributes:
         server_url (str): GNS3 server URL endpoint
         username (str): Authentication username
@@ -74,16 +63,6 @@ class GNS3NetworkManager:
     def _authenticate(self) -> bool:
         """
         Perform OAuth2 authentication with GNS3 v3 API.
-        
-        Uses form data authentication as required by OAuth2 Password Bearer flow.
-        Sets up session headers with bearer token for subsequent requests.
-        
-        Returns:
-            bool: True if authentication successful, False otherwise
-            
-        Raises:
-            requests.exceptions.RequestException: If network request fails
-            ValueError: If server response is invalid
         """
         logger.info("Authenticating with GNS3 v3 API using OAuth2 Password Bearer")
         
@@ -109,7 +88,7 @@ class GNS3NetworkManager:
             )
             
             logger.debug(f"Authentication response status: {response.status_code}")
-            
+            #code== 200:OK Works open 2xx Succesful!
             if response.status_code == 200:
                 response_data = response.json()
                 self.access_token = response_data.get('access_token')
@@ -121,13 +100,13 @@ class GNS3NetworkManager:
                         'Content-Type': 'application/json'
                     })
                     
-                    logger.info("Authentication successful, bearer token configured")
+                    logger.info("Authentication successful, bearer token configured #code== 200:OK Works open 2xx Succesful!")
                     return True
                 else:
                     logger.error("No access token received in authentication response")
                     return False
             else:
-                logger.error(f"Authentication failed with status {response.status_code}: {response.text}")
+                logger.error(f"Authentication failed with status #code== 422 4xx Client Error! {response.status_code}: {response.text}")
                 return False
                 
         except requests.exceptions.RequestException as e:
@@ -152,7 +131,7 @@ class GNS3NetworkManager:
         
         try:
             response = self.session.get(f"{self.server_url}/v3/projects", timeout=10)
-            
+            #code== 200:OK Works open 2xx Succesful!
             if response.status_code == 200:
                 projects = response.json()
                 logger.info(f"Successfully retrieved {len(projects)} projects")
@@ -176,13 +155,6 @@ class GNS3NetworkManager:
         
         Args:
             project_name (str): Name for the new project
-            **kwargs: Additional project configuration options:
-                - auto_close (bool): Automatically close project when unused
-                - auto_open (bool): Automatically open project on server start
-                - auto_start (bool): Automatically start all nodes when project opens
-                - scene_width (int): Project canvas width in pixels
-                - scene_height (int): Project canvas height in pixels
-                - zoom (int): Default zoom level percentage
         
         Returns:
             Optional[str]: Project ID if creation successful, None if failed
@@ -194,19 +166,7 @@ class GNS3NetworkManager:
         
         # Default project configuration
         project_config = {
-            "name": project_name,
-            "auto_close": kwargs.get('auto_close', True),
-            "auto_open": kwargs.get('auto_open', False),
-            "auto_start": kwargs.get('auto_start', False),
-            "drawing_grid_size": kwargs.get('drawing_grid_size', 25),
-            "grid_size": kwargs.get('grid_size', 75),
-            "scene_height": kwargs.get('scene_height', 1000),
-            "scene_width": kwargs.get('scene_width', 2000),
-            "show_grid": kwargs.get('show_grid', False),
-            "show_interface_labels": kwargs.get('show_interface_labels', False),
-            "show_layers": kwargs.get('show_layers', False),
-            "snap_to_grid": kwargs.get('snap_to_grid', False),
-            "zoom": kwargs.get('zoom', 100)
+            "name": project_name
         }
         
         try:
@@ -215,7 +175,7 @@ class GNS3NetworkManager:
                 json=project_config,
                 timeout=15
             )
-            
+            #code== 201:OK Works Created Succesful!
             if response.status_code == 201:
                 project_data = response.json()
                 project_id = project_data.get('project_id')
@@ -229,6 +189,7 @@ class GNS3NetworkManager:
                 return None
                 
         except requests.exceptions.RequestException as e:
+            #code== 422 4xx Client Error!
             logger.error(f"Network error creating project: {e}")
             return None
     
@@ -247,7 +208,7 @@ class GNS3NetworkManager:
         
         try:
             response = self.session.get(f"{self.server_url}/v3/projects/{project_id}", timeout=10)
-            
+            #code== 200:OK Works open 2xx Succesful!
             if response.status_code == 200:
                 project_details = response.json()
                 logger.debug(f"Project details retrieved: {project_details.get('name')}")
@@ -257,6 +218,7 @@ class GNS3NetworkManager:
                 return None
                 
         except requests.exceptions.RequestException as e:
+            #code== 422 4xx Client Error!
             logger.error(f"Network error getting project details: {e}")
             return None
     
@@ -274,12 +236,14 @@ class GNS3NetworkManager:
         
         try:
             response = self.session.post(f"{self.server_url}/v3/projects/{project_id}/open", timeout=15)
-            
+            #code== 200:OK Works open 2xx Succesful! and
+            #code== 201: Created Works open 2xx Succesful!
             if response.status_code in [200, 201]:
                 logger.info("Project opened successfully")
                 self.current_project_id = project_id
                 return True
             else:
+                #code== 422 4xx Client Error!
                 logger.error(f"Failed to open project: {response.status_code} - {response.text}")
                 return False
                 
@@ -301,7 +265,7 @@ class GNS3NetworkManager:
         
         try:
             response = self.session.post(f"{self.server_url}/v3/projects/{project_id}/close", timeout=15)
-            
+            # code = 204 No Content but ok succesfull
             if response.status_code == 204:
                 logger.info("Project closed successfully")
                 if self.current_project_id == project_id:

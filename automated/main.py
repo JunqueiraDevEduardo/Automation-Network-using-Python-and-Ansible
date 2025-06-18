@@ -24,11 +24,10 @@ from typing import Dict, List, Optional
 import logging
 
 # Import custom modules for network automation functionality
-# These modules handle GNS3 topology building, project verification, and authentication
 sys.path.append(str(Path(__file__).parent))
-from scripts.gns3.build_gns3_topology import NetworkAutomationGenerator
+from scripts.gns3.fixed_generator import NetworkAutomationGenerator
 from scripts.gns3.verify_existing_project import EnhancedGNS3Builder
-#add here the other scripts of gns3!
+from scripts.gns3.diagnostic import GNS3NetworkManager
 
 class NetworkAutomationController:
     """
@@ -147,7 +146,7 @@ class NetworkAutomationController:
             gateway = dept.get('gateway', 'N/A')
             
             # Calculate device count (handle different data structures)
-            devices = dept.get('devices', {})
+            devices = dept.get('devices', [])
             if isinstance(devices, dict):
                 dept_total = sum(devices.values())  # Sum up device counts by type
             else:
@@ -178,9 +177,6 @@ class NetworkAutomationController:
             generator = NetworkAutomationGenerator(str(self.config_path))
             generator.save_all_files()  # Generate inventory, playbooks, and roles
             
-            # Organize generated files into proper Ansible directory structure
-            self.organize_ansible_files()
-            
             print("Ansible configuration generated successfully")
             
         except Exception as e:
@@ -188,249 +184,126 @@ class NetworkAutomationController:
             self.logger.error(f"Error generating Ansible config: {e}")
             print(f"Error: {e}")
 
-    def organize_ansible_files(self):
-        """
-        Move generated files from temporary location to proper Ansible directory structure.
-        Ensures files are placed in correct locations for Ansible to find them.
-        """
-        source_dir = self.base_path / "network_automation"
-        
-        if source_dir.exists():
-            # Move inventory file to production inventory location
-            if (source_dir / "inventory.yml").exists():
-                (source_dir / "inventory.yml").rename(
-                    self.ansible_path / "inventories" / "production" / "hosts.yml"
-                )
-            
-            # Move playbooks to playbooks directory
-            for playbook in ["configure_vlans.yml", "configure_interfaces.yml"]:
-                if (source_dir / playbook).exists():
-                    (source_dir / playbook).rename(
-                        self.ansible_path / "playbooks" / playbook
-                    )
-
     def deploy_network_config(self):
         """
         Deploy network configuration using Ansible playbooks.
-        Provides options for different deployment scopes (full, network devices, end devices, department).
+        Provides options for different deployment scopes.
         """
         print("\nDEPLOYING NETWORK CONFIGURATION")
         print("-" * 40)
         
-        # Verify Ansible is installed and configured before deployment
-        if not self.check_ansible_prerequisites():
+        # Check if generated files exist
+        network_automation_dir = self.base_path / "scripts" / "gns3" / "network_automation"
+        if not network_automation_dir.exists():
+            print("No generated configuration found. Please run 'Generate Ansible Configuration' first.")
             return
         
-        # Present deployment options to user
-        print("Select deployment type:")
-        print("1. Full deployment (all devices)")
-        print("2. Network devices only (switches/routers)")
-        print("3. End devices only (PCs/servers)")
-        print("4. Specific department")
+        print("Available deployment options:")
+        print("1. Show generated inventory")
+        print("2. Show generated playbooks")
+        print("3. Show PC configuration script")
         
-        choice = input("Choice (1-4): ").strip()
+        choice = input("Choice (1-3): ").strip()
         
-        try:
-            # Execute appropriate deployment based on user choice
-            if choice == "1":
-                self.run_full_deployment()
-            elif choice == "2":
-                self.run_network_devices_deployment()
-            elif choice == "3":
-                self.run_end_devices_deployment()
-            elif choice == "4":
-                self.run_department_deployment()
-            else:
-                print("Invalid choice")
-                
-        except Exception as e:
-            # Log deployment errors for troubleshooting
-            self.logger.error(f"Deployment error: {e}")
-            print(f"Deployment failed: {e}")
+        if choice == "1":
+            self.show_generated_inventory()
+        elif choice == "2":
+            self.show_generated_playbooks()
+        elif choice == "3":
+            self.show_pc_script()
+        else:
+            print("Invalid choice")
 
-    def check_ansible_prerequisites(self) -> bool:
-        """
-        Verify that Ansible and required collections are installed.
-        Checks for Ansible binary and cisco.ios collection specifically.
-        Returns True if all prerequisites are met, False otherwise.
-        """
-        try:
-            # Check if Ansible is installed and accessible
-            result = subprocess.run(['ansible', '--version'], 
-                                  capture_output=True, text=True)
-            if result.returncode != 0:
-                print("Ansible not installed")
-                print("Install with: pip install ansible")
-                return False
-            
-            # Check if Cisco IOS collection is installed (required for network device management)
-            result = subprocess.run(['ansible-galaxy', 'collection', 'list'], 
-                                  capture_output=True, text=True)
-            if 'cisco.ios' not in result.stdout:
-                print("Cisco IOS collection not found")
-                install = input("Install now? (y/n): ").lower().strip()
-                if install == 'y':
-                    # Install the required collection automatically
-                    subprocess.run(['ansible-galaxy', 'collection', 'install', 'cisco.ios'])
-                else:
-                    return False
-            
-            return True
-            
-        except FileNotFoundError:
-            # Ansible not found in system PATH
-            print("Ansible not found in PATH")
-            return False
+    def show_generated_inventory(self):
+        """Show the generated Ansible inventory."""
+        inventory_file = self.base_path / "scripts" / "gns3" / "network_automation" / "inventory.yml"
+        if inventory_file.exists():
+            print("\nGenerated Inventory:")
+            print("-" * 20)
+            with open(inventory_file, 'r') as f:
+                print(f.read())
+        else:
+            print("Inventory file not found")
 
-    def run_full_deployment(self):
-        """
-        Execute complete network deployment using the main site playbook.
-        Deploys configuration to all devices in the network topology.
-        """
-        # Define paths to inventory and main playbook
-        inventory_path = self.ansible_path / "inventories" / "production" / "hosts.yml"
-        site_playbook = self.ansible_path / "site.yml"
+    def show_generated_playbooks(self):
+        """Show the generated Ansible playbooks."""
+        playbooks_dir = self.base_path / "scripts" / "gns3" / "network_automation"
         
-        # Verify inventory file exists before attempting deployment
-        if not inventory_path.exists():
-            print("Inventory file not found. Generate configuration first.")
-            return
-        
-        # Construct and execute Ansible playbook command
-        cmd = [
-            'ansible-playbook', 
-            '-i', str(inventory_path),  # Specify inventory file
-            str(site_playbook)          # Specify playbook to run
-        ]
-        
-        print(f"Running: {' '.join(cmd)}")
-        subprocess.run(cmd, cwd=str(self.ansible_path))
+        for playbook in ["configure_vlans.yml", "configure_interfaces.yml"]:
+            playbook_file = playbooks_dir / playbook
+            if playbook_file.exists():
+                print(f"\n{playbook}:")
+                print("-" * 30)
+                with open(playbook_file, 'r') as f:
+                    content = f.read()
+                    print(content[:500] + "..." if len(content) > 500 else content)
 
-    def run_network_devices_deployment(self):
-        """
-        Deploy configuration only to network infrastructure devices (switches and routers).
-        Uses specialized playbook for network device configuration.
-        """
-        inventory_path = self.ansible_path / "inventories" / "production" / "hosts.yml"
-        playbook_path = self.ansible_path / "playbooks" / "network-devices.yml"
-        
-        cmd = [
-            'ansible-playbook',
-            '-i', str(inventory_path),
-            str(playbook_path)
-        ]
-        
-        subprocess.run(cmd, cwd=str(self.ansible_path))
-
-    def run_end_devices_deployment(self):
-        """
-        Deploy configuration only to end devices (PCs and servers).
-        Uses playbook specifically designed for end device configuration.
-        """
-        inventory_path = self.ansible_path / "inventories" / "production" / "hosts.yml"
-        playbook_path = self.ansible_path / "playbooks" / "configure-pcs.yml"
-        
-        cmd = [
-            'ansible-playbook',
-            '-i', str(inventory_path),
-            str(playbook_path)
-        ]
-        
-        subprocess.run(cmd, cwd=str(self.ansible_path))
-
-    def run_department_deployment(self):
-        """
-        Deploy configuration to devices in a specific department only.
-        Allows targeted deployment using Ansible's limit functionality.
-        """
-        departments = self.config.get('departments', [])
-        if not departments:
-            print("No departments configured")
-            return
-        
-        # Display available departments for selection
-        print("Available departments:")
-        for i, dept in enumerate(departments, 1):
-            print(f"{i}. {dept.get('name', 'Unknown')}")
-        
-        try:
-            # Get user selection and execute limited deployment
-            choice = int(input("Select department: ")) - 1
-            dept = departments[choice]
-            dept_name = dept.get('name', 'Unknown')
-            
-            # Use --limit flag to restrict deployment to specific department
-            cmd = [
-                'ansible-playbook',
-                '-i', str(self.ansible_path / "inventories" / "production" / "hosts.yml"),
-                '--limit', dept_name,  # Limit execution to specific department
-                str(self.ansible_path / "site.yml")
-            ]
-            
-            subprocess.run(cmd, cwd=str(self.ansible_path))
-            
-        except (ValueError, IndexError):
-            print("Invalid department selection")
+    def show_pc_script(self):
+        """Show the generated PC configuration script."""
+        script_file = self.base_path / "scripts" / "gns3" / "network_automation" / "configure_pcs.sh"
+        if script_file.exists():
+            print("\nPC Configuration Script:")
+            print("-" * 30)
+            with open(script_file, 'r') as f:
+                lines = f.readlines()
+                # Show first 50 lines
+                for line in lines[:50]:
+                    print(line.rstrip())
+                if len(lines) > 50:
+                    print(f"\n... and {len(lines) - 50} more lines")
+        else:
+            print("PC script not found")
 
     def gns3_operations(self):
         """
         Handle GNS3 server operations and project management.
-        Provides submenu for GNS3-related functionality.
         """
         print("\nGNS3 OPERATIONS")
         print("-" * 30)
-        print("1. Diagnose GNS3 Connection")
+        print("1. Test GNS3 Connection")
         print("2. Connect to Existing Project")
-        print("3. List Available Projects")
-        print("4. Project Health Check")
-        print("5. Back to Main Menu")
+        print("3. Back to Main Menu")
         
-        choice = input("Choice (1-5): ").strip()
+        choice = input("Choice (1-3): ").strip()
         
-        # Execute selected GNS3 operation
         if choice == "1":
-            self.diagnose_gns3()
+            self.test_gns3_connection()
         elif choice == "2":
             self.connect_to_gns3_project()
-        elif choice == "3":
-            self.list_gns3_projects()
-        elif choice == "4":
-            self.gns3_health_check()
 
-    def diagnose_gns3(self):
-        """
-        Run comprehensive GNS3 connection diagnostics.
-        Tests authentication, connectivity, and API accessibility.
-        """
-        print("\nGNS3 CONNECTION DIAGNOSTICS")
-        print("-" * 35)
+    def test_gns3_connection(self):
+        """Test connection to GNS3 server."""
+        print("\nTesting GNS3 Connection...")
+        print("-" * 30)
         
         try:
-            # Use GNS3AuthDiagnostic to test connection and authentication
-            diagnostic = GNS3AuthDiagnostic(self.gns3_server)
-            diagnostic.comprehensive_test("admin", "admin")  # Test with default credentials
+            # Use diagnostic manager to test connection
+            diagnostic = GNS3NetworkManager(self.gns3_server, "admin", "admin")
+            projects = diagnostic.list_projects()
+            
+            if projects:
+                print(f"Successfully connected to GNS3 server")
+                print(f"Found {len(projects)} projects")
+            else:
+                print("Connected to server but no projects found")
+                
         except Exception as e:
-            print(f"Diagnostic error: {e}")
+            print(f"Connection failed: {e}")
 
     def connect_to_gns3_project(self):
-        """
-        Connect to an existing GNS3 project using project ID.
-        Establishes connection and stores project reference for future operations.
-        """
+        """Connect to an existing GNS3 project."""
         project_id = input("Enter project ID: ").strip()
         if not project_id:
             print("Project ID required")
             return
         
         try:
-            # Create GNS3 builder instance and connect to specified project
             builder = EnhancedGNS3Builder(
                 config_file=str(self.config_path),
                 gns3_server=self.gns3_server,
                 project_id=project_id
             )
             
-            # Display project information and store connection
             builder.print_project_summary()
             self.project_id = project_id
             print("Connected successfully")
@@ -438,257 +311,101 @@ class NetworkAutomationController:
         except Exception as e:
             print(f"Connection failed: {e}")
 
-    def list_gns3_projects(self):
-        """
-        List all available projects on the GNS3 server.
-        Helps users identify correct project IDs for connection.
-        """
-        print("\nAvailable GNS3 Projects")
-        print("-" * 30)
-        try:
-            # Create temporary builder instance to access project listing functionality
-            builder = EnhancedGNS3Builder(
-                config_file=str(self.config_path),
-                gns3_server=self.gns3_server,
-                project_id="dummy"  # Placeholder ID for listing operation
-            )
-            builder.list_available_projects()
-        except:
-            print("Could not retrieve project list")
-
-    def gns3_health_check(self):
-        """
-        Perform comprehensive health check of GNS3 server.
-        Tests server status, compute nodes, and overall system health.
-        """
-        print("\nGNS3 HEALTH CHECK")
-        print("-" * 25)
-        try:
-            builder = EnhancedGNS3Builder(
-                config_file=str(self.config_path),
-                gns3_server=self.gns3_server,
-                project_id="dummy"
-            )
-            builder.check_server_health()
-        except Exception as e:
-            print(f"Health check failed: {e}")
-
     def verify_connectivity(self):
-        """
-        Verify network connectivity to all configured devices using Ansible ping.
-        Tests reachability of network devices, end devices, and all devices.
-        """
+        """Verify network connectivity placeholder."""
         print("\nNETWORK CONNECTIVITY VERIFICATION")
         print("-" * 45)
-        
-        # Path to Ansible inventory file
-        inventory_path = self.ansible_path / "inventories" / "production" / "hosts.yml"
-        
-        if not inventory_path.exists():
-            print("Inventory not found. Generate configuration first.")
-            return
-        
-        # Test different device groups for comprehensive connectivity verification
-        device_groups = ["network_devices", "end_devices", "all"]
-        
-        for group in device_groups:
-            print(f"\nTesting {group}...")
-            # Use Ansible ping module to test connectivity
-            cmd = [
-                'ansible', group,
-                '-i', str(inventory_path),
-                '-m', 'ping'  # Ansible ping module
-            ]
-            
-            try:
-                result = subprocess.run(cmd, capture_output=True, text=True, 
-                                      cwd=str(self.ansible_path))
-                if result.returncode == 0:
-                    print(f"{group}: All devices reachable")
-                else:
-                    print(f"{group}: Some devices unreachable")
-                    print(result.stderr)
-            except Exception as e:
-                print(f"Error testing {group}: {e}")
 
     def backup_configurations(self):
-        """
-        Execute backup script to save current device configurations.
-        Calls external backup script if available.
-        """
+        """Configuration backup placeholder."""
         print("\nBACKUP CONFIGURATIONS")
         print("-" * 30)
-        
-        # Path to backup script
-        backup_script = self.scripts_path / "deployment" / "deploy.sh"
-        
-        if backup_script.exists():
-            # Execute backup script with backup parameter
-            cmd = [str(backup_script), "backup"]
-            subprocess.run(cmd)
-        else:
-            print("Backup script not found")
-            print("Run deployment setup first")
 
     def network_monitoring(self):
-        """
-        Network monitoring dashboard placeholder.
-        This function is prepared for future monitoring capabilities.
-        """
+        """Network monitoring placeholder."""
         print("\nNETWORK MONITORING")
         print("-" * 25)
-        print("Feature under development")
-        print("Future capabilities:")
-        print("- Real-time device status")
-        print("- Performance metrics")
-        print("- Alert management")
 
     def troubleshooting_tools(self):
-        """
-        Network troubleshooting tools menu.
-        Provides access to various diagnostic and troubleshooting utilities.
-        """
+        """Network troubleshooting tools."""
         print("\nTROUBLESHOOTING TOOLS")
         print("-" * 30)
         print("1. Ping Test")
-        print("2. Traceroute")
-        print("3. Port Scan")
-        print("4. Configuration Diff")
-        print("5. Log Analysis")
-        print("6. Back to Main Menu")
+        print("2. View Logs")
+        print("3. Back to Main Menu")
         
-        choice = input("Choice (1-6): ").strip()
+        choice = input("Choice (1-3): ").strip()
         
-        # Execute selected troubleshooting tool
         if choice == "1":
             self.ping_test()
         elif choice == "2":
-            self.traceroute_test()
-        elif choice == "3":
-            self.port_scan()
-        elif choice == "4":
-            self.config_diff()
-        elif choice == "5":
-            self.log_analysis()
+            self.view_logs()
 
     def ping_test(self):
-        """Execute simple ping test to specified target IP address."""
+        """Execute simple ping test."""
         target = input("Enter target IP: ").strip()
         if target:
-            # Run system ping command with 4 packets
-            subprocess.run(['ping', '-c', '4', target])
+            try:
+                result = subprocess.run(['ping', '-c', '4', target], 
+                                      capture_output=True, text=True)
+                print(f"\nPing results:")
+                print(result.stdout)
+            except Exception as e:
+                print(f"Ping failed: {e}")
 
-    def traceroute_test(self):
-        """Execute traceroute to specified target to trace network path."""
-        target = input("Enter target IP: ").strip()
-        if target:
-            # Run system traceroute command
-            subprocess.run(['traceroute', target])
-
-    def port_scan(self):
-        """Port scanning functionality placeholder."""
-        print("Port scan feature under development")
-
-    def config_diff(self):
-        """Configuration difference analysis placeholder."""
-        print("Config diff feature under development")
-
-    def log_analysis(self):
-        """
-        Display recent log entries from the automation log file.
-        Shows last 20 log entries for quick troubleshooting.
-        """
+    def view_logs(self):
+        """Display recent log entries."""
         log_path = self.base_path / "logs" / "automation.log"
         if log_path.exists():
             print("\nRecent log entries:")
+            print("-" * 30)
             with open(log_path, 'r') as f:
                 lines = f.readlines()
-                # Display last 20 lines of the log file
-                for line in lines[-20:]:
+                # Display last 10 lines
+                for line in lines[-10:]:
                     print(line.strip())
         else:
             print("No log file found")
 
     def settings_menu(self):
-        """
-        Settings and configuration management menu.
-        Allows viewing, editing, and managing system configuration.
-        """
+        """Settings and configuration management."""
         print("\nSETTINGS & CONFIGURATION")
         print("-" * 35)
         print("1. View Current Configuration")
         print("2. Edit GNS3 Server URL")
-        print("3. Reset Configuration")
-        print("4. Export Configuration")
-        print("5. Import Configuration")
-        print("6. Back to Main Menu")
+        print("3. Back to Main Menu")
         
-        choice = input("Choice (1-6): ").strip()
+        choice = input("Choice (1-3): ").strip()
         
-        # Execute selected settings operation
         if choice == "1":
             self.view_configuration()
         elif choice == "2":
             self.edit_gns3_server()
-        elif choice == "3":
-            self.reset_configuration()
-        elif choice == "4":
-            self.export_configuration()
-        elif choice == "5":
-            self.import_configuration()
 
     def view_configuration(self):
-        """Display current configuration in YAML format."""
+        """Display current configuration."""
         print("\nCurrent Configuration:")
+        print("-" * 30)
         print(yaml.dump(self.config, default_flow_style=False, indent=2))
 
     def edit_gns3_server(self):
         """Allow user to modify GNS3 server URL."""
         current = self.gns3_server
         print(f"Current GNS3 server: {current}")
-        new_server = input("Enter new server URL: ").strip()
+        new_server = input("Enter new server URL (or press Enter to keep current): ").strip()
         if new_server:
             self.gns3_server = new_server
             print(f"Server updated to: {new_server}")
-
-    def reset_configuration(self):
-        """Reset configuration to default empty state with user confirmation."""
-        confirm = input("Are you sure? This will reset all settings (y/n): ").lower()
-        if confirm == 'y':
-            self.config = {"departments": []}
-            print("Configuration reset")
-
-    def export_configuration(self):
-        """Export current configuration to specified file."""
-        filename = input("Export filename: ").strip()
-        if filename:
-            try:
-                with open(filename, 'w') as f:
-                    yaml.dump(self.config, f, default_flow_style=False)
-                print(f"Configuration exported to {filename}")
-            except Exception as e:
-                print(f"Export failed: {e}")
-
-    def import_configuration(self):
-        """Import configuration from specified file."""
-        filename = input("Import filename: ").strip()
-        if filename and Path(filename).exists():
-            try:
-                with open(filename, 'r') as f:
-                    self.config = yaml.safe_load(f)
-                print(f"Configuration imported from {filename}")
-            except Exception as e:
-                print(f"Import failed: {e}")
         else:
-            print("File not found")
+            print("Server URL unchanged")
 
     def run(self):
         """
         Main application loop that handles user interaction.
-        Displays menu, processes user input, and executes corresponding functions.
-        Includes error handling and graceful shutdown capabilities.
         """
         print("Starting Network Automation Controller...")
+        print(f"Config file: {self.config_file}")
+        print(f"Base path: {self.base_path}")
         
         while True:
             try:
@@ -725,19 +442,14 @@ class NetworkAutomationController:
                 input("\nPress Enter to continue...")
                 
             except KeyboardInterrupt:
-                # Handle Ctrl+C gracefully
                 print("\n\nGoodbye!")
                 break
             except Exception as e:
-                # Log and display unexpected errors
                 self.logger.error(f"Unexpected error: {e}")
                 print(f"Unexpected error: {e}")
 
 def main():
-    """
-    Entry point for the application.
-    Handles command line arguments and initializes the controller.
-    """
+    """Entry point for the application."""
     # Set up command line argument parsing
     parser = argparse.ArgumentParser(description="Network Automation Controller")
     parser.add_argument('--config', '-c', default='config/network_data.yml',

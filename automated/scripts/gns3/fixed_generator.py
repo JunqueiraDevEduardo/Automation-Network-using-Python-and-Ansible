@@ -1,149 +1,138 @@
-#!/usr/bin/env python3
 """
-Fixed Network Automation Generator
-This script correctly processes your network_data.yml configuration structure
+Network Automation Generator:
+All HTTP codes are here:https://umbraco.com/knowledge-base/http-status-codes/
+
+This script correctly processes network_data.yml configuration structure, 
+this structure was equals to the same structure of the manual network
 and generates proper Ansible inventory and playbooks for network automation.
-
-The original script expected different field names, but this version works
-with your actual configuration structure.
 """
-
+##################################
+#Imports
+##################################
 import yaml
 import json
 from pathlib import Path
+import math
+import os
 
-def generate_from_your_config():
+class NetworkAutomationGenerator:
     """
-    Main function that processes your network configuration and generates
-    all necessary Ansible automation files including inventory and playbooks.
+    Main class responsible for converting network configurations into
+    automated deployment files. Generates Ansible inventories, playbooks,
+    configuration scripts, and network topology data.
     """
-    print("Loading your configuration...")
     
-    # Load your actual network configuration from YAML file
-    # This reads the config/network_data.yml file with your department structure
-    # CORRECTED PATH: Going up two directories to reach config folder
-    config_path = Path(__file__).parent.parent.parent / 'config' / 'network_data.yml'
-    
-    # Alternative: Use absolute path from project root
-    # config_path = Path('automated/config/network_data.yml')
-    
-    print(f"Looking for configuration at: {config_path}")
-    print(f"Absolute path: {config_path.absolute()}")
-    
-    try:
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-        print("✓ Configuration loaded successfully")
-    except FileNotFoundError:
-        print(f"✗ Configuration file not found at: {config_path}")
-        print("Current working directory:", Path.cwd())
-        print("Script location:", Path(__file__).parent)
+    def __init__(self, config_file: str = "config/network_data.yml"):
+        """
+        Initialize the generator with configuration file path.
+        Sets up data structures for storing device, VLAN, and network information.
+        """
+        self.config_file = config_file
+        self.load_config()
         
-        # Try to find the file in common locations
-        possible_paths = [
-            Path('../../config/network_data.yml'),
-            Path('../../../config/network_data.yml'),
-            Path('automated/config/network_data.yml'),
-            Path('config/network_data.yml'),
-            Path('../config/network_data.yml')
-        ]
+        # Initialize storage for parsed network components
+        self.devices = {}   # Dictionary to store device configurations
+        self.vlans = {}     # Dictionary to store VLAN information
+        self.networks = {}  # Dictionary to store network segment data
         
-        for p in possible_paths:
-            if p.exists():
-                print(f"Found configuration at: {p}")
-                with open(p, 'r') as f:
-                    config = yaml.safe_load(f)
-                break
-        else:
-            raise FileNotFoundError("Could not find network_data.yml in any expected location")
-    
-    # Extract departments list from configuration
-    departments = config.get('departments', [])
-    print(f"Found {len(departments)} departments")
-    
-    # Initialize Ansible inventory structure with device type groups
-    # This creates the standard Ansible inventory format with host groups
-    inventory = {
-        'all': {
-            'children': {
-                'switches': {'hosts': {}},  # Network switches
-                'routers': {'hosts': {}},   # Network routers  
-                'pcs': {'hosts': {}},       # End-user PCs
-                'servers': {'hosts': {}}    # Server devices
+    def load_config(self):
+        """
+        Load network configuration from YAML file.
+        Handles file not found errors and creates default empty configuration.
+        """
+        try:
+            # Try the provided path first
+            config_path = Path(self.config_file)
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    self.config = yaml.safe_load(f)
+                print(f"Configuration loaded from {self.config_file}")
+                return
+            
+            # Try alternative paths if the provided path doesn't work
+            possible_paths = [
+                Path(__file__).parent.parent.parent / 'config' / 'network_data.yml',
+                Path('automated/config/network_data.yml'),
+                Path('config/network_data.yml'),
+                Path('../config/network_data.yml')
+            ]
+            
+            for path in possible_paths:
+                if path.exists():
+                    with open(path, 'r') as f:
+                        self.config = yaml.safe_load(f)
+                    print(f"Configuration loaded from {path}")
+                    return
+            
+            # If no file found, create default configuration
+            print(f"Configuration file {self.config_file} not found")
+            self.config = {"departments": []}
+            
+        except yaml.YAMLError as e:
+            print(f"Error parsing YAML file: {e}")
+            self.config = {"departments": []}
+        except Exception as e:
+            print(f"Error loading configuration: {e}")
+            self.config = {"departments": []}
+
+    def generate_network_inventory(self) -> dict:
+        """
+        Generate Ansible inventory structure from department configuration.
+        Creates organized inventory with switches, routers, PCs, and servers.
+        """
+        departments = self.config.get('departments', [])
+        
+        # Initialize Ansible inventory structure with device type groups
+        inventory = {
+            'all': {
+                'children': {
+                    'switches': {'hosts': {}},
+                    'routers': {'hosts': {}},
+                    'pcs': {'hosts': {}},
+                    'servers': {'hosts': {}}
+                }
             }
         }
-    }
-    
-    # Initialize list to store VLAN configurations for playbook generation
-    vlan_config = []
-    
-    # Process each department from your configuration
-    for dept in departments:
-        # Extract department information using your config field names
-        dept_name = dept.get('name', 'Unknown')
-        vlan_id = dept.get('vlan', 1)  # Your config uses 'vlan', not 'vlan_id'
-        devices = dept.get('devices', [])
         
-        print(f"Processing {dept_name} - VLAN {vlan_id} - {len(devices)} devices")
-        
-        # Add VLAN configuration for this department
-        # Clean up department name for valid VLAN naming
-        clean_name = dept_name.replace('/', '-').replace(' ', '-').replace('&', 'and')
-        vlan_config.append({
-            'vlan_id': vlan_id,
-            'name': clean_name,
-            'state': 'active'
-        })
-        
-        # Process each device in the department
-        for device in devices:
-            device_name = device.get('name', 'unknown')
-            device_type = device.get('type', 'unknown')
-            device_ip = device.get('ip', '192.168.1.1')
+        # Process each department from configuration
+        for dept in departments:
+            dept_name = dept.get('name', 'Unknown')
+            vlan_id = dept.get('vlan', 1)
+            devices = dept.get('devices', [])
             
-            # Categorize devices by type and add to appropriate inventory group
-            if device_type == 'switch':
-                inventory['all']['children']['switches']['hosts'][device_name] = {
+            # Process each device in the department
+            for device in devices:
+                device_name = device.get('name', 'unknown')
+                device_type = device.get('type', 'unknown')
+                device_ip = device.get('ip', '192.168.1.1')
+                
+                device_info = {
                     'ansible_host': device_ip,
                     'department': dept_name,
                     'vlan_id': vlan_id
                 }
-            elif device_type == 'router':
-                inventory['all']['children']['routers']['hosts'][device_name] = {
-                    'ansible_host': device_ip,
-                    'department': dept_name,
-                    'vlan_id': vlan_id
-                }
-            elif device_type == 'pc' and not device_name.startswith('server'):
-                # Regular PCs (excluding servers that might be marked as 'pc')
-                inventory['all']['children']['pcs']['hosts'][device_name] = {
-                    'ansible_host': device_ip,
-                    'department': dept_name,
-                    'vlan_id': vlan_id
-                }
-            
-            # Handle servers (some are marked as 'pc' but have 'server' in name)
-            # This catches both explicit servers and server devices marked as other types
-            if 'server' in device_name.lower() or device_name.startswith('Server'):
-                inventory['all']['children']['servers']['hosts'][device_name] = {
-                    'ansible_host': device_ip,
-                    'department': dept_name,
-                    'vlan_id': vlan_id
-                }
-    
-    # Create output directory for generated files
-    output_dir = Path(__file__).parent / "network_automation"
-    output_dir.mkdir(exist_ok=True)
-    print(f"\nCreating output directory: {output_dir}")
-    
-    # Save the generated inventory to YAML file
-    with open(output_dir / 'inventory.yml', 'w') as f:
-        yaml.dump(inventory, f, default_flow_style=False, indent=2)
-    print("✓ Generated inventory.yml")
-    
-    # Generate VLAN configuration playbook
-    # This creates an Ansible playbook to configure VLANs on all switches
-    vlan_playbook = """---
+                
+                # Categorize devices by type
+                if device_type == 'switch':
+                    inventory['all']['children']['switches']['hosts'][device_name] = device_info
+                elif device_type == 'router':
+                    inventory['all']['children']['routers']['hosts'][device_name] = device_info
+                elif device_type == 'pc' and not device_name.startswith('server'):
+                    inventory['all']['children']['pcs']['hosts'][device_name] = device_info
+                
+                # Handle servers
+                if 'server' in device_name.lower() or device_name.startswith('Server'):
+                    inventory['all']['children']['servers']['hosts'][device_name] = device_info
+        
+        return inventory
+
+    def generate_vlan_config_playbook(self) -> str:
+        """
+        Generate Ansible playbook for configuring VLANs on network switches.
+        """
+        departments = self.config.get('departments', [])
+        
+        playbook = """---
 - name: Configure VLANs on Network Switches
   hosts: switches
   gather_facts: no
@@ -161,30 +150,33 @@ def generate_from_your_config():
       cisco.ios.ios_vlans:
         config:
 """
-    
-    # Add each VLAN configuration to the playbook
-    for vlan in vlan_config:
-        vlan_playbook += f"""          - vlan_id: {vlan['vlan_id']}
-            name: "{vlan['name']}"
-            state: {vlan['state']}
+        
+        # Add VLAN configuration entries for each department
+        for dept in departments:
+            vlan_id = dept.get('vlan', 1)
+            clean_name = dept.get('name', 'Unknown').replace('/', '-').replace(' ', '-').replace('&', 'and')
+            
+            playbook += f"""          - vlan_id: {vlan_id}
+            name: "{clean_name}"
+            state: active
 """
-    
-    # Add playbook footer with merge operation and configuration save
-    vlan_playbook += """        state: merged
+        
+        playbook += """        state: merged
         
     - name: Save configuration
       cisco.ios.ios_config:
         save_when: always
 """
-    
-    # Save VLAN configuration playbook
-    with open(output_dir / 'configure_vlans.yml', 'w') as f:
-        f.write(vlan_playbook)
-    print("✓ Generated configure_vlans.yml")
-    
-    # Generate interface configuration playbook
-    # This creates switch port configurations for end devices
-    interface_playbook = """---
+        
+        return playbook
+
+    def generate_interface_config_playbook(self) -> str:
+        """
+        Generate Ansible playbook for configuring switch interfaces.
+        """
+        departments = self.config.get('departments', [])
+        
+        playbook = """---
 - name: Configure Switch Interfaces
   hosts: switches
   gather_facts: no
@@ -202,66 +194,64 @@ def generate_from_your_config():
       cisco.ios.ios_l2_interfaces:
         config:
 """
-    
-    # Add interface configurations for access devices
-    port_num = 1  # Start with port 1
-    for dept in departments:
-        vlan_id = dept.get('vlan', 1)
-        devices = dept.get('devices', [])
         
-        # Identify devices that need access ports (PCs and servers)
-        access_devices = [d for d in devices if d.get('type') in ['pc'] or 'server' in d.get('name', '').lower()]
-        
-        # Configure access port for each end device
-        for device in access_devices:
-            interface = f"FastEthernet0/{port_num}"
-            interface_playbook += f"""          - name: {interface}
+        # Add interface configurations for access devices
+        port_num = 1
+        for dept in departments:
+            vlan_id = dept.get('vlan', 1)
+            devices = dept.get('devices', [])
+            
+            # Identify devices that need access ports
+            access_devices = [d for d in devices if d.get('type') in ['pc'] or 'server' in d.get('name', '').lower()]
+            
+            for device in access_devices:
+                interface = f"FastEthernet0/{port_num}"
+                playbook += f"""          - name: {interface}
             access:
               vlan: {vlan_id}
 """
-            port_num += 1  # Move to next available port
-    
-    # Add interface playbook footer
-    interface_playbook += """        state: merged
+                port_num += 1
+        
+        playbook += """        state: merged
         
     - name: Save configuration
       cisco.ios.ios_config:
         save_when: always
 """
-    
-    # Save interface configuration playbook
-    with open(output_dir / 'configure_interfaces.yml', 'w') as f:
-        f.write(interface_playbook)
-    print("✓ Generated configure_interfaces.yml")
-    
-    # Generate PC configuration script for end devices
-    pc_script = """#!/bin/bash
+        
+        return playbook
+
+    def generate_pc_config_script(self) -> str:
+        """
+        Generate bash script for configuring PC network settings.
+        """
+        departments = self.config.get('departments', [])
+        
+        script = """#!/bin/bash
 # PC Network Configuration Script
 # Configures IP addresses and gateways for all department PCs and servers
 
 echo "Configuring PC Network Settings..."
 
 """
-    
-    # Add configuration commands for each department
-    for dept in departments:
-        dept_name = dept.get('name', 'Unknown')
-        vlan_id = dept.get('vlan', 1)
-        gateway = dept.get('gateway', '192.168.1.1')
-        devices = dept.get('devices', [])
         
-        pc_script += f"""
+        for dept in departments:
+            dept_name = dept.get('name', 'Unknown')
+            vlan_id = dept.get('vlan', 1)
+            gateway = dept.get('gateway', '192.168.1.1')
+            devices = dept.get('devices', [])
+            
+            script += f"""
 # {dept_name} Department (VLAN {vlan_id})
 echo "Configuring {dept_name} devices..."
 """
-        
-        # Add configuration for each PC/server in the department
-        for device in devices:
-            if device.get('type') == 'pc' or 'server' in device.get('name', '').lower():
-                device_name = device.get('name', 'unknown')
-                device_ip = device.get('ip', '192.168.1.2')
-                
-                pc_script += f"""
+            
+            for device in devices:
+                if device.get('type') == 'pc' or 'server' in device.get('name', '').lower():
+                    device_name = device.get('name', 'unknown')
+                    device_ip = device.get('ip', '192.168.1.2')
+                    
+                    script += f"""
 # Configure {device_name}
 echo "  Setting up {device_name}: {device_ip}"
 # For Ubuntu/Linux systems:
@@ -273,373 +263,247 @@ echo "  Setting up {device_name}: {device_ip}"
 # netsh interface ip set address "Ethernet" static {device_ip} 255.255.255.0 {gateway}
 # netsh interface ip set dns "Ethernet" static 8.8.8.8
 """
-    
-    pc_script += """
+        
+        script += """
 echo "PC configuration completed!"
-echo "Note: Uncomment and modify the appropriate commands for your operating system"
+echo "Note: Uncomment and modify the appropriate commands for operating system"
 """
-    
-    # Save PC configuration script and make it executable
-    with open(output_dir / 'configure_pcs.sh', 'w') as f:
-        f.write(pc_script)
-    
-    # Make the script executable
-    import os
-    os.chmod(output_dir / 'configure_pcs.sh', 0o755)
-    print("✓ Generated configure_pcs.sh")
-    
-    # Generate network diagram data for visualization
-    diagram_data = generate_network_diagram(departments)
-    with open(output_dir / 'network_diagram.json', 'w') as f:
-        json.dump(diagram_data, f, indent=2)
-    print("✓ Generated network_diagram.json")
-    
-    # Generate README documentation
-    readme_content = generate_readme_content(departments, vlan_config)
-    with open(output_dir / 'README.md', 'w') as f:
-        f.write(readme_content)
-    print("✓ Generated README.md")
-    
-    # Print generation summary
-    print("\n" + "="*50)
-    print("GENERATION COMPLETE!")
-    print("="*50)
-    print(f"Output directory: {output_dir.absolute()}")
-    print(f"- Inventory with {len(departments)} departments")
-    print(f"- VLAN config with {len(vlan_config)} VLANs")
-    print(f"- Interface config with ports for access devices")
-    print(f"- PC configuration script")
-    print(f"- Network diagram data")
-    print(f"- README documentation")
-    
-    # Display device summary statistics
-    total_switches = len(inventory['all']['children']['switches']['hosts'])
-    total_routers = len(inventory['all']['children']['routers']['hosts']) 
-    total_pcs = len(inventory['all']['children']['pcs']['hosts'])
-    total_servers = len(inventory['all']['children']['servers']['hosts'])
-    
-    print(f"\nDevice Summary:")
-    print(f"- Switches: {total_switches}")
-    print(f"- Routers: {total_routers}")
-    print(f"- PCs: {total_pcs}")
-    print(f"- Servers: {total_servers}")
-    print(f"- Total: {total_switches + total_routers + total_pcs + total_servers}")
+        
+        return script
 
-def generate_network_diagram(departments):
-    """
-    Generate network topology data for visualization tools.
-    Creates nodes and links representing the network structure.
-    
-    Args:
-        departments: List of department configurations
+    def generate_network_diagram_data(self) -> dict:
+        """
+        Generate JSON data for network topology visualization.
+        """
+        departments = self.config.get('departments', [])
         
-    Returns:
-        Dictionary containing nodes, links, and VLAN information
-    """
-    import math
-    
-    # Initialize diagram data structure
-    diagram_data = {
-        'nodes': [],  # Network devices and endpoints
-        'links': [],  # Connections between devices
-        'vlans': {}   # VLAN information for visualization
-    }
-    
-    # Add central core switch
-    diagram_data['nodes'].append({
-        'id': 'CoreSwitch',
-        'label': 'Core Switch', 
-        'type': 'switch',
-        'x': 0,
-        'y': 0,
-        'color': '#FF6B6B'
-    })
-    
-    # Calculate circular layout for departments
-    num_depts = len(departments)
-    radius = 300
-    
-    # Position each department switch in a circle around core switch
-    for i, dept in enumerate(departments):
-        angle = (2 * math.pi * i) / num_depts if num_depts > 0 else 0
-        x = int(radius * math.cos(angle))
-        y = int(radius * math.sin(angle))
-        
-        dept_name = dept.get('name', 'Unknown')
-        vlan_id = dept.get('vlan', 1)
-        
-        # Find department switch from devices
-        dept_switch = None
-        for device in dept.get('devices', []):
-            if device.get('type') == 'switch' and not 'Server' in device.get('name', ''):
-                dept_switch = device
-                break
-        
-        if dept_switch:
-            switch_id = dept_switch.get('name', f'SW-{i}')
-            diagram_data['nodes'].append({
-                'id': switch_id,
-                'label': f"{switch_id}\n{dept_name}",
-                'type': 'switch',
-                'x': x,
-                'y': y,
-                'color': '#4ECDC4',
-                'vlan': vlan_id
-            })
-            
-            # Link to core switch
-            diagram_data['links'].append({
-                'source': 'CoreSwitch',
-                'target': switch_id,
-                'type': 'trunk',
-                'vlan': vlan_id
-            })
-        
-        # Store VLAN information
-        diagram_data['vlans'][vlan_id] = {
-            'name': dept_name,
-            'network': dept.get('subnet', '192.168.1.0/24'),
-            'gateway': dept.get('gateway', '192.168.1.1'),
-            'color': '#4ECDC4'
+        diagram_data = {
+            'nodes': [],
+            'links': [],
+            'vlans': {}
         }
-    
-    return diagram_data
-
-def generate_readme_content(departments, vlan_config):
-    """
-    Generate comprehensive README documentation for the automation files.
-    
-    Args:
-        departments: List of department configurations
-        vlan_config: List of VLAN configurations
         
-    Returns:
-        String containing complete README content
-    """
-    readme = f"""# Network Automation Files
+        # Add central core switch
+        diagram_data['nodes'].append({
+            'id': 'CoreSwitch',
+            'label': 'Core Switch',
+            'type': 'switch',
+            'x': 0,
+            'y': 0,
+            'color': '#FF6B6B'
+        })
+        
+        # Calculate circular layout for departments
+        num_depts = len(departments)
+        radius = 300
+        
+        for i, dept in enumerate(departments):
+            angle = (2 * math.pi * i) / num_depts if num_depts > 0 else 0
+            x = int(radius * math.cos(angle))
+            y = int(radius * math.sin(angle))
+            
+            dept_name = dept.get('name', 'Unknown')
+            vlan_id = dept.get('vlan', 1)
+            
+            # Find department switch from devices
+            dept_switch = None
+            for device in dept.get('devices', []):
+                if device.get('type') == 'switch' and not 'Server' in device.get('name', ''):
+                    dept_switch = device
+                    break
+            
+            if dept_switch:
+                switch_id = dept_switch.get('name', f'SW-{i}')
+                diagram_data['nodes'].append({
+                    'id': switch_id,
+                    'label': f"{switch_id}\n{dept_name}",
+                    'type': 'switch',
+                    'x': x,
+                    'y': y,
+                    'color': '#4ECDC4',
+                    'vlan': vlan_id
+                })
+                
+                # Link to core switch
+                diagram_data['links'].append({
+                    'source': 'CoreSwitch',
+                    'target': switch_id,
+                    'type': 'trunk',
+                    'vlan': vlan_id
+                })
+            
+            # Store VLAN information
+            diagram_data['vlans'][vlan_id] = {
+                'name': dept_name,
+                'network': dept.get('subnet', '192.168.1.0/24'),
+                'gateway': dept.get('gateway', '192.168.1.1'),
+                'color': '#4ECDC4'
+            }
+        
+        return diagram_data
 
-This directory contains automated configuration files generated from your network setup.
+    def generate_readme(self) -> str:
+        """
+        Generate README documentation file with usage instructions.
+        """
+        departments = self.config.get('departments', [])
+        
+        readme = f"""# Network Automation Files
+
+This directory contains automated configuration files generated from network setup.
 
 ## Generated Files
 
 ### Inventory
-- `inventory.yml` - Ansible inventory with all network devices organized by type
+- `inventory.yml` - Ansible inventory with all network devices
 
-### Playbooks  
-- `configure_vlans.yml` - Configures VLANs on network switches
-- `configure_interfaces.yml` - Configures switch access ports for end devices
+### Playbooks
+- `configure_vlans.yml` - Configures VLANs on switches
+- `configure_interfaces.yml` - Configures switch interfaces
 
 ### Scripts
-- `configure_pcs.sh` - Shell script to configure PC and server network settings
+- `configure_pcs.sh` - Script to configure PC network settings
 
 ### Documentation
-- `network_diagram.json` - Network topology data for visualization tools
-- `README.md` - This documentation file
+- `network_diagram.json` - Network topology data for visualization
+- `README.md` - This file
 
 ## Network Overview
 
 **Departments:** {len(departments)}
-**VLANs configured:** {len(vlan_config)}
 
 ### Department Summary:
 """
-    
-    # Add department details to README
-    for dept in departments:
-        dept_name = dept.get('name', 'Unknown')
-        vlan_id = dept.get('vlan', 1)
-        subnet = dept.get('subnet', 'N/A')
-        device_count = len(dept.get('devices', []))
         
-        readme += f"""
+        for dept in departments:
+            dept_name = dept.get('name', 'Unknown')
+            vlan_id = dept.get('vlan', 1)
+            subnet = dept.get('subnet', 'N/A')
+            device_count = len(dept.get('devices', []))
+            
+            readme += f"""
 - **{dept_name}**
   - VLAN: {vlan_id}
   - Subnet: {subnet}
   - Devices: {device_count}
 """
-    
-    readme += """
+        
+        readme += """
 ## Usage Instructions
 
-### 1. Deploy Switch Configurations with Ansible
-
+### 1. Configure Switches with Ansible
 ```bash
-# Install Ansible and required collections
+# Install Ansible and Cisco collection
 pip install ansible
 ansible-galaxy collection install cisco.ios
 
-# Configure VLANs on all switches
+# Run VLAN configuration
 ansible-playbook -i inventory.yml configure_vlans.yml
 
-# Configure switch interfaces  
+# Run interface configuration
 ansible-playbook -i inventory.yml configure_interfaces.yml
 ```
 
-### 2. Configure PC Network Settings
-
-Make the script executable and run it:
+### 2. Configure PCs
 ```bash
+# Make script executable and run
 chmod +x configure_pcs.sh
 ./configure_pcs.sh
 ```
 
-Note: Edit the script to uncomment the appropriate commands for your operating system (Linux or Windows).
-
-### 3. Verify Network Configuration
-
-After running the playbooks, you can verify the configuration:
-
-```bash
-# Check VLAN configuration
-ansible switches -i inventory.yml -m cisco.ios.ios_command -a "commands='show vlan brief'"
-
-# Check interface configuration  
-ansible switches -i inventory.yml -m cisco.ios.ios_command -a "commands='show interfaces status'"
-
-# Test connectivity between departments
-ansible pcs -i inventory.yml -m ping -a "dest=<target_ip>"
-```
-
-## Network Architecture
-
-The network is structured with:
-
-- **Core Switch**: Central hub connecting all department switches
-- **Department Switches**: One per department, connects local devices
-- **VLANs**: Isolate traffic by department for security and performance
-- **Access Ports**: Connect end devices (PCs/servers) to department switches
-
-## File Generated From
-
-This automation was generated from: `automated/config/network_data.yml`
-
-## Next Steps
-
-1. Review and customize the generated configurations
-2. Update device credentials in the playbooks if needed
-3. Test on a lab environment before production deployment
-4. Document any manual changes made to the configurations
-
-For more information, see the main project documentation.
+This automation was generated from  network configuration file.
 """
-    
-    return readme
+        
+        return readme
 
-def validate_configuration(config_file):
-    """
-    Validate the network configuration file before processing.
-    
-    Args:
-        config_file: Path to the configuration file
+    def save_all_files(self):
+        """
+        Save all generated configuration files to the output directory.
+        Creates inventory, playbooks, scripts, and documentation files.
+        """
+        print("\nSaving automation files...")
         
-    Returns:
-        tuple: (is_valid, error_messages)
-    """
-    errors = []
-    
-    try:
-        with open(config_file, 'r') as f:
-            config = yaml.safe_load(f)
-    except FileNotFoundError:
-        return False, [f"Configuration file not found: {config_file}"]
-    except yaml.YAMLError as e:
-        return False, [f"Invalid YAML format: {e}"]
-    
-    # Check for required top-level structure
-    if 'departments' not in config:
-        errors.append("Missing 'departments' key in configuration")
-        return False, errors
-    
-    departments = config['departments']
-    if not isinstance(departments, list):
-        errors.append("'departments' must be a list")
-        return False, errors
-    
-    # Validate each department
-    used_vlans = set()
-    used_ips = set()
-    
-    for i, dept in enumerate(departments):
-        dept_prefix = f"Department {i+1}"
+        # Create output directory for generated files
+        output_dir = Path(__file__).parent / "network_automation"
+        output_dir.mkdir(exist_ok=True)
         
-        # Check required fields
-        if 'name' not in dept:
-            errors.append(f"{dept_prefix}: Missing 'name' field")
+        # Generate and save all files
+        inventory = self.generate_network_inventory()
+        with open(output_dir / "inventory.yml", 'w') as f:
+            yaml.dump(inventory, f, default_flow_style=False, indent=2)
+        print("Saved inventory.yml")
         
-        if 'vlan' not in dept:
-            errors.append(f"{dept_prefix}: Missing 'vlan' field")
-        else:
-            vlan_id = dept['vlan']
-            if not isinstance(vlan_id, int) or vlan_id < 1 or vlan_id > 4094:
-                errors.append(f"{dept_prefix}: Invalid VLAN ID {vlan_id} (must be 1-4094)")
-            elif vlan_id in used_vlans:
-                errors.append(f"{dept_prefix}: Duplicate VLAN ID {vlan_id}")
-            else:
-                used_vlans.add(vlan_id)
+        vlan_playbook = self.generate_vlan_config_playbook()
+        with open(output_dir / "configure_vlans.yml", 'w') as f:
+            f.write(vlan_playbook)
+        print("Saved configure_vlans.yml")
         
-        # Check devices
-        if 'devices' not in dept:
-            errors.append(f"{dept_prefix}: Missing 'devices' field")
-        elif not isinstance(dept['devices'], list):
-            errors.append(f"{dept_prefix}: 'devices' must be a list")
-        else:
-            devices = dept['devices']
-            for j, device in enumerate(devices):
-                device_prefix = f"{dept_prefix}, Device {j+1}"
-                
-                # Check required device fields
-                required_fields = ['name', 'type', 'ip']
-                for field in required_fields:
-                    if field not in device:
-                        errors.append(f"{device_prefix}: Missing '{field}' field")
-                
-                # Check device type
-                if 'type' in device:
-                    valid_types = ['switch', 'router', 'pc', 'server']
-                    if device['type'] not in valid_types:
-                        errors.append(f"{device_prefix}: Invalid device type '{device['type']}' (must be one of {valid_types})")
-                
-                # Check IP address format and uniqueness
-                if 'ip' in device:
-                    ip_addr = device['ip']
-                    if ip_addr in used_ips:
-                        errors.append(f"{device_prefix}: Duplicate IP address {ip_addr}")
-                    else:
-                        used_ips.add(ip_addr)
-                    
-                    # Basic IP format validation
-                    import re
-                    ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
-                    if not re.match(ip_pattern, ip_addr):
-                        errors.append(f"{device_prefix}: Invalid IP address format {ip_addr}")
-    
-    return len(errors) == 0, errors
+        interface_playbook = self.generate_interface_config_playbook()
+        with open(output_dir / "configure_interfaces.yml", 'w') as f:
+            f.write(interface_playbook)
+        print("Saved configure_interfaces.yml")
+        
+        pc_script = self.generate_pc_config_script()
+        with open(output_dir / "configure_pcs.sh", 'w') as f:
+            f.write(pc_script)
+        os.chmod(output_dir / "configure_pcs.sh", 0o755)
+        print("Saved configure_pcs.sh")
+        
+        diagram_data = self.generate_network_diagram_data()
+        with open(output_dir / "network_diagram.json", 'w') as f:
+            json.dump(diagram_data, f, indent=2)
+        print("Saved network_diagram.json")
+        
+        readme_content = self.generate_readme()
+        with open(output_dir / "README.md", 'w') as f:
+            f.write(readme_content)
+        print("Saved README.md")
+        
+        print(f"\nAll files saved to '{output_dir}' directory")
 
+    def run(self):
+        """
+        Main execution method that orchestrates the entire generation process.
+        Displays network overview and generates all configuration files.
+        """
+        print("Network Automation Generator")
+        print("=" * 50)
+        
+        departments = self.config.get('departments', [])
+        print(f"Network Overview:")
+        print(f"  Departments: {len(departments)}")
+        
+        total_devices = 0
+        for dept in departments:
+            devices = dept.get('devices', [])
+            dept_total = len(devices)
+            total_devices += dept_total
+            print(f"  {dept['name']}: {dept_total} devices (VLAN {dept['vlan']})")
+        
+        print(f"  Total devices: {total_devices}")
+        
+        # Generate all configuration files
+        self.save_all_files()
+        
+        print(f"\nNext Steps:")
+        print(f"1. Check the 'network_automation' directory for generated files")
+        print(f"2. Use the Ansible playbooks to configure  switches")
+        print(f"3. Run the PC configuration script on  endpoints")
+
+# Keep the main function for standalone execution
 def main():
     """
-    Main entry point for the network automation generator.
-    Validates configuration and generates automation files.
+    Main function that serves as the entry point for the script.
     """
-    print("Network Automation Generator Starting...")
-    print("=" * 50)
-    
     try:
-        # Generate automation files
-        generate_from_your_config()
-        print("\n✅ Network automation files generated successfully!")
-        print("\nNext steps:")
-        print("1. Review the generated files in the 'network_automation' directory")
-        print("2. Update credentials in the playbook files") 
-        print("3. Test the configuration on a lab environment first")
-        print("4. Deploy to production network")
-        
-        return 0
-        
+        generator = NetworkAutomationGenerator()
+        generator.run()
+    except KeyboardInterrupt:
+        print("\nCancelled by user")
     except Exception as e:
-        print(f"❌ Error generating automation files: {e}")
+        print(f"\nError: {e}")
         import traceback
         traceback.print_exc()
-        return 1
 
 if __name__ == "__main__":
-    exit(main())
+    main()

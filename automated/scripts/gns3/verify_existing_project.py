@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 ############################################################
 # GNS3 Project Verification Script
 # This script connects to an existing GNS3 project and provides 
@@ -385,13 +384,6 @@ def main():
             print("Docker/OrbStack commands not found")
         except Exception as diag_e:
             print(f"Diagnostic error: {diag_e}")
-            
-        # Provide suggested solutions for common issues
-        print("\nSuggested solutions:")
-        print("1. Find your container's IP: docker inspect <container_name> | grep IPAddress")
-        print("2. Or set up port forwarding: docker run -p 3080:3080 <image>")
-        print("3. Or try connecting directly to container network")
-        print("4. Check if GNS3 server is using v2 or v3 API")
 
 # Script entry point - execute main function when script is run directly
 if __name__ == "__main__":
