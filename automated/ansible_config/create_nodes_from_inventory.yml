@@ -48,17 +48,48 @@
       x: "{{ 100 + (switch_index * 150) }}"
       y: "{{ 100 + ((switch_index // 10) * 100) }}"
       properties:
-        ports_mapping: >-
-          [
-            {% for i in range(8) %}
-            {
-              "name": "Ethernet{{ i }}",
-              "port_number": {{ i }},
-              "type": "access",
-              "vlan": {{ switch_vlan_map[item.name] }}
-            }{% if not loop.last %},{% endif %}
-            {% endfor %}
-          ]
+        ports_mapping:
+          - name: "Ethernet0"
+            port_number: 0
+            type: access
+            vlan: 1
+          - name: "Ethernet1"
+            port_number: 1
+            type: access
+            vlan: 1
+          - name: "Ethernet2"
+            port_number: 2
+            type: access
+            vlan: 1
+          - name: "Ethernet3"
+            port_number: 3
+            type: access
+            vlan: 1
+          - name: "Ethernet4"
+            port_number: 4
+            type: access
+            vlan: 1
+          - name: "Ethernet5"
+            port_number: 5
+            type: access
+            vlan: 1
+          - name: "Ethernet6"
+            port_number: 6
+            type: access
+            vlan: 1
+          - name: "Ethernet7"
+            port_number: 7
+            type: access
+            vlan: 1
+          - name: "Ethernet8"
+            port_number: 8
+            type: access
+            vlan: 1
+          - name: "Ethernet9"
+            port_number: 9
+            type: access
+            vlan: 1
+
     status_code: [201, 409]
   loop: "{{ all_devices | selectattr('type', 'equalto', 'switch') | list }}"
   loop_control:
