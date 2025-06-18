@@ -1,207 +1,285 @@
 #!/usr/bin/env python3
 """
-GNS3 Authentication Diagnostic Tool
-This script helps diagnose authentication issues with GNS3 server
+Final GNS3 Authentication Fix
+Based on the OAuth2PasswordBearer requirement from your API docs
 """
 
 import requests
-import getpass
 import json
-from typing import Dict, Any
+from urllib.parse import urlencode
 
-class GNS3AuthDiagnostic:
-    def __init__(self, server_url: str = "http://127.0.0.1:3080"):
-        self.server = server_url.rstrip('/')
-        self.session = requests.Session()
-        self.session.verify = False
+def try_oauth2_format():
+    """
+    Try OAuth2 password bearer format (form data instead of JSON).
+    """
+    print(" Trying OAuth2 Password Bearer format...")
+    
+    server = "http://127.0.0.1:3080"
+    username = "admin"
+    password = "admin"
+    
+    session = requests.Session()
+    session.verify = False
+    
+    # OAuth2 typically expects form data, not JSON
+    auth_data = {
+        "username": username,
+        "password": password
+    }
+    
+    endpoints_to_try = [
+        "/v3/access/users/login",
+        "/v3/access/users/authenticate"
+    ]
+    
+    for endpoint in endpoints_to_try:
+        print(f"\n Testing: {endpoint}")
         
-    def test_endpoint(self, endpoint: str, auth_method: str = None, auth_data: Any = None) -> Dict:
-        """Test a specific endpoint with given authentication"""
-        test_session = requests.Session()
-        test_session.verify = False
-        
-        if auth_method == 'basic' and auth_data:
-            test_session.auth = auth_data
-        elif auth_method == 'bearer' and auth_data:
-            test_session.headers.update({'Authorization': f'Bearer {auth_data}'})
-        
+        # Method 1: Form data (OAuth2 standard)
         try:
-            response = test_session.get(f"{self.server}{endpoint}", timeout=10)
-            return {
-                'status_code': response.status_code,
-                'success': response.status_code == 200,
-                'response_size': len(response.text),
-                'content_type': response.headers.get('content-type', 'unknown'),
-                'error': None
-            }
-        except Exception as e:
-            return {
-                'status_code': None,
-                'success': False,
-                'response_size': 0,
-                'content_type': 'error',
-                'error': str(e)
-            }
-    
-    def get_auth_token(self, username: str, password: str) -> str:
-        """Try to get authentication token"""
-        login_endpoints = [
-            "/v3/access/users/login",
-            "/v2/auth/login", 
-            "/auth/login",
-            "/login"
-        ]
-        
-        for endpoint in login_endpoints:
-            try:
-                response = requests.post(
-                    f"{self.server}{endpoint}",
-                    json={"username": username, "password": password},
-                    timeout=10,
-                    verify=False
-                )
-                
-                if response.status_code == 200:
+            print(" Trying form data...")
+            response = session.post(
+                f"{server}{endpoint}", 
+                data=auth_data,  # Using data= instead of json=
+                headers={'Content-Type': 'application/x-www-form-urlencoded'},
+                timeout=10
+            )
+            
+            print(f" Status: {response.status_code}")
+            
+            if response.status_code == 200:
+                print(f" Form data worked!")
+                try:
                     data = response.json()
-                    token = data.get("token") or data.get("access_token")
+                    token = data.get('access_token') or data.get('token')
                     if token:
-                        print(f"✓ Token obtained from {endpoint}")
-                        return token
-                else:
-                    print(f"⚠ {endpoint}: {response.status_code}")
-                    
-            except Exception as e:
-                print(f"⚠ {endpoint} failed: {e}")
-        
-        return None
-    
-    def comprehensive_test(self, username: str, password: str):
-        """Run comprehensive authentication tests"""
-        print("🔍 GNS3 Authentication Diagnostic")
-        print("=" * 50)
-        
-        # Test basic connectivity
-        print("\n1. Basic Connectivity Test")
-        print("-" * 30)
-        
-        basic_endpoints = [
-            "/",
-            "/version", 
-            "/v2/version",
-            "/v3/version",
-            "/static/web-ui/server/version"
-        ]
-        
-        for endpoint in basic_endpoints:
-            result = self.test_endpoint(endpoint)
-            status = "✓" if result['success'] else "✗"
-            print(f"{status} {endpoint}: {result['status_code']} ({result['response_size']} bytes)")
-        
-        # Try to get authentication token
-        print("\n2. Authentication Token Test")
-        print("-" * 30)
-        
-        token = self.get_auth_token(username, password)
-        
-        # Test different authentication methods
-        print("\n3. Authentication Method Tests")
-        print("-" * 30)
-        
-        auth_methods = [
-            ('none', None),
-            ('basic', (username, password))
-        ]
-        
-        if token:
-            auth_methods.append(('bearer', token))
-        
-        test_endpoints = [
-            "/v2/projects",
-            "/v3/projects", 
-            "/v2/templates",
-            "/v3/templates"
-        ]
-        
-        results = {}
-        
-        for auth_name, auth_data in auth_methods:
-            print(f"\nTesting {auth_name} authentication:")
-            results[auth_name] = {}
-            
-            for endpoint in test_endpoints:
-                result = self.test_endpoint(endpoint, auth_name, auth_data)
-                status = "✓" if result['success'] else "✗"
-                results[auth_name][endpoint] = result
-                print(f"  {status} {endpoint}: {result['status_code']}")
-        
-        # Summary and recommendations
-        print("\n4. Summary & Recommendations")
-        print("-" * 30)
-        
-        working_methods = []
-        for auth_name, endpoints in results.items():
-            working_count = sum(1 for r in endpoints.values() if r['success'])
-            if working_count > 0:
-                working_methods.append((auth_name, working_count, len(endpoints)))
-                print(f"✓ {auth_name}: {working_count}/{len(endpoints)} endpoints working")
+                        print(f"   Token received: {token[:20]}...")
+                        return test_token(session, server, token)
+                    else:
+                        print(f"    No token in response: {list(data.keys())}")
+                except:
+                    print(f"    Non-JSON response: {response.text[:100]}")
+            elif response.status_code == 422:
+                print(f"   Still 422: {response.text}")
             else:
-                print(f"✗ {auth_name}: No endpoints working")
+                print(f"   Status {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            print(f"   Error: {e}")
         
-        if working_methods:
-            best_method = max(working_methods, key=lambda x: x[1])
-            print(f"\n🎯 Recommended: Use '{best_method[0]}' authentication")
+        # Method 2: Try different field names
+        try:
+            print("   Trying different field names...")
+            alt_data = {
+                "email": username,  # Some APIs use email instead of username
+                "password": password
+            }
             
-            if best_method[0] == 'bearer' and token:
-                print(f"   Token: {token[:20]}...")
-            elif best_method[0] == 'basic':
-                print(f"   Username: {username}")
-                print(f"   Password: [hidden]")
+            response = session.post(
+                f"{server}{endpoint}", 
+                data=alt_data,
+                headers={'Content-Type': 'application/x-www-form-urlencoded'},
+                timeout=10
+            )
+            
+            print(f"   Status: {response.status_code}")
+            
+            if response.status_code == 200:
+                print(f"  Alternative field names worked!")
+                data = response.json()
+                token = data.get('access_token') or data.get('token')
+                if token:
+                    print(f"  Token received: {token[:20]}...")
+                    return test_token(session, server, token)
+                    
+        except Exception as e:
+            print(f"   Alt fields error: {e}")
+        
+        # Method 3: Try JSON with different structure
+        try:
+            print("   Trying nested JSON structure...")
+            nested_data = {
+                "user": {
+                    "username": username,
+                    "password": password
+                }
+            }
+            
+            response = session.post(
+                f"{server}{endpoint}", 
+                json=nested_data,
+                timeout=10
+            )
+            
+            print(f"  Status: {response.status_code}")
+            
+            if response.status_code == 200:
+                print(f"   Nested structure worked!")
+                data = response.json()
+                token = data.get('access_token') or data.get('token')
+                if token:
+                    print(f"  Token received: {token[:20]}...")
+                    return test_token(session, server, token)
+                    
+        except Exception as e:
+            print(f"   Nested JSON error: {e}")
+    
+    return False
+
+def test_token(session, server, token):
+    """
+    Test if the token works for accessing protected endpoints.
+    """
+    print(f"\n Testing token...")
+    
+    # Set up authenticated session
+    session.headers.update({
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    })
+    
+    try:
+        response = session.get(f"{server}/v3/projects", timeout=10)
+        print(f" GET /v3/projects: {response.status_code}")
+        
+        if response.status_code == 200:
+            projects = response.json()
+            print(f" SUCCESS! Found {len(projects)} projects")
+            
+            for project in projects:
+                print(f"   - {project.get('name', 'Unnamed')} ({project.get('project_id', 'No ID')})")
+            
+            return True
         else:
-            print("\n❌ No working authentication method found!")
-            print("\nTroubleshooting steps:")
-            print("1. Check if GNS3 server is running")
-            print("2. Verify server address and port")
-            print("3. Check username/password")
-            print("4. Try accessing GNS3 web interface manually")
+            print(f" Token doesn't work: {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f" Error testing token: {e}")
+        return False
+
+def try_basic_auth_on_projects():
+    """
+    Try basic auth directly on projects endpoint.
+    """
+    print(f"\n Trying basic auth directly on projects...")
+    
+    server = "http://127.0.0.1:3080"
+    session = requests.Session()
+    session.verify = False
+    session.auth = ('admin', 'admin')
+    
+    try:
+        response = session.get(f"{server}/v3/projects", timeout=10)
+        print(f" Status: {response.status_code}")
         
-        # Check for specific error patterns
-        print("\n5. Error Pattern Analysis")
-        print("-" * 30)
+        if response.status_code == 200:
+            projects = response.json()
+            print(f" Basic auth works! Found {len(projects)} projects")
+            return True
+        else:
+            print(f" Basic auth failed: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f" Basic auth error: {e}")
+        return False
+
+def check_if_auth_disabled():
+    """
+    Check if authentication might be completely disabled.
+    """
+    print(f"\n Checking if authentication is disabled...")
+    
+    server = "http://127.0.0.1:3080"
+    session = requests.Session()
+    session.verify = False
+    
+    # Try accessing projects without any authentication
+    try:
+        response = session.get(f"{server}/v3/projects", timeout=5)
+        print(f" No-auth status: {response.status_code}")
         
-        all_results = []
-        for endpoints in results.values():
-            all_results.extend(endpoints.values())
+        if response.status_code == 200:
+            projects = response.json()
+            print(f" AUTHENTICATION IS DISABLED! Found {len(projects)} projects")
+            print("You can access the API without authentication!")
+            return True
+        else:
+            print(f" Authentication is required: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f" Error: {e}")
+        return False
+
+def create_project_no_auth():
+    """
+    Try to create a project without authentication.
+    """
+    print(f"\n Trying to create project without authentication...")
+    
+    server = "http://127.0.0.1:3080"
+    session = requests.Session()
+    session.verify = False
+    
+    project_data = {
+        "name": "Test Automation Project",
+        "auto_close": True,
+        "auto_open": False,
+        "auto_start": False
+    }
+    
+    try:
+        response = session.post(f"{server}/v3/projects", json=project_data, timeout=15)
+        print(f" Status: {response.status_code}")
         
-        status_codes = [r['status_code'] for r in all_results if r['status_code']]
-        
-        if 401 in status_codes:
-            print("⚠ Found 401 Unauthorized errors - authentication issue")
-        if 403 in status_codes:
-            print("⚠ Found 403 Forbidden errors - permission issue")
-        if 404 in status_codes:
-            print("⚠ Found 404 Not Found errors - wrong API version or endpoint")
-        if 500 in status_codes:
-            print("⚠ Found 500 Server errors - GNS3 server issue")
-        
-        connection_errors = [r for r in all_results if r['error']]
-        if connection_errors:
-            print(f"⚠ Found {len(connection_errors)} connection errors")
-            for error in connection_errors[:3]:  # Show first 3 errors
-                print(f"   - {error['error']}")
+        if response.status_code == 201:
+            project = response.json()
+            project_id = project.get('project_id')
+            print(f" SUCCESS! Project created without authentication!")
+            print(f" Project ID: {project_id}")
+            print(f" Project Name: {project.get('name')}")
+            return project_id
+        else:
+            print(f" Failed: {response.text}")
+            return None
+            
+    except Exception as e:
+        print(f" Error: {e}")
+        return None
 
 def main():
-    """Main diagnostic function"""
-    print("🌐 GNS3 Authentication Diagnostic Tool")
+    """
+    Main function to try all authentication methods.
+    """
+    print(" Complete GNS3 Authentication Test")
     print("=" * 50)
     
-    # Get user input
-    server = input("GNS3 Server URL (default: http://127.0.0.1:3080): ").strip() or "http://127.0.0.1:3080"
-    username = input("Username (default: admin): ").strip() or "admin"
-    password = getpass.getpass("Password (default: admin): ") or "admin"
+    # Step 1: Check if auth is disabled
+    if check_if_auth_disabled():
+        print(f"\n GREAT NEWS! Authentication is disabled!")
+        print(f"You can use the API directly without any authentication.")
+        
+        # Try to create a project
+        project_id = create_project_no_auth()
+        if project_id:
+            print(f"\n You're all set! Use this new project ID: {project_id}")
+        
+        return
     
-    # Run diagnostic
-    diagnostic = GNS3AuthDiagnostic(server)
-    diagnostic.comprehensive_test(username, password)
+    # Step 2: Try OAuth2 format
+    if try_oauth2_format():
+        print(f"\n OAuth2 authentication working!")
+        return
+    
+    # Step 3: Try basic auth
+    if try_basic_auth_on_projects():
+        print(f"\n Basic authentication working!")
+        return
+
+  
 
 if __name__ == "__main__":
     main()
