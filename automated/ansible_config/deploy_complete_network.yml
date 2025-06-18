@@ -81,7 +81,7 @@
         
     # Phase 5: Create nodes from network configuration
     - name: "Phase 5: Create nodes"
-      include: create_nodes_from_inventory.yml
+      include_tasks: create_nodes_from_inventory.yml
       
     - name: Wait for nodes to be created
       pause:
@@ -89,7 +89,7 @@
         
     # Phase 6: Create network links between nodes
     - name: "Phase 6: Create links"
-      include: create_links_from_inventory.yml
+      include_tasks: create_links_from_inventory.yml
       
     - name: Wait for links to be established
       pause:
@@ -98,12 +98,12 @@
     # Phase 7: Configure VLANs on switches
     # Note: This requires the switches to be running and accessible
     - name: "Phase 7: Configure VLANs"
-      include: configure_vlans.yml
+      include_tasks: configure_vlans.yml
       when: configure_vlans | default(true) | bool
       
     # Phase 8: Configure switch interfaces
     - name: "Phase 8: Configure interfaces"
-      include: configure_interfaces.yml
+      include_tasks: configure_interfaces.yml
       when: configure_interfaces | default(true) | bool
       
     # Phase 9: Final verification
