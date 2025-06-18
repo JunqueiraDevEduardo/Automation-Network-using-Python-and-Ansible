@@ -28,7 +28,7 @@ import logging
 sys.path.append(str(Path(__file__).parent))
 from scripts.gns3.build_gns3_topology import NetworkAutomationGenerator
 from scripts.gns3.verify_existing_project import EnhancedGNS3Builder
-from scripts.gns3.auth_diagnostic import GNS3AuthDiagnostic
+#add here the other scripts of gns3!
 
 class NetworkAutomationController:
     """

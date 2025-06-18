@@ -8,6 +8,7 @@ import requests
 import json
 from urllib.parse import urlencode
 
+
 def try_oauth2_format():
     """
     Try OAuth2 password bearer format (form data instead of JSON).
