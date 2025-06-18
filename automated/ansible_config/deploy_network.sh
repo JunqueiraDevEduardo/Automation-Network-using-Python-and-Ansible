@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 
 # Script configuration
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CONFIG_DIR="${SCRIPT_DIR}/../../config"
+CONFIG_DIR="${SCRIPT_DIR}"
 ANSIBLE_DIR="${SCRIPT_DIR}"
 
 # Logging functions with timestamp
