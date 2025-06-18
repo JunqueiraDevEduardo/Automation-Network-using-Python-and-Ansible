@@ -14,7 +14,7 @@
     # Obter lista de todos os nodes do projeto
     - name: Get all project nodes
       uri:
-        url: "{{ gns3_server }}/v2/projects/{{ project_id }}/nodes"
+        url: "{{ gns3_server }}/v3/projects/{{ project_id }}/nodes"
         method: GET
         user: "{{ gns3_user }}"
         password: "{{ gns3_password }}"
@@ -36,7 +36,7 @@
     # Criation links  (PCs/Servers -> Switches)
     - name: Create departmental links
       uri:
-        url: "{{ gns3_server }}/v2/projects/{{ project_id }}/links"
+        url: "{{ gns3_server }}/v3/projects/{{ project_id }}/links"
         method: POST
         user: "{{ gns3_user }}"
         password: "{{ gns3_password }}"
@@ -79,7 +79,7 @@
     # Criation links  (Switches -> Core/Routers)
     - name: Create inter-departmental links
       uri:
-        url: "{{ gns3_server }}/v2/projects/{{ project_id }}/links"
+        url: "{{ gns3_server }}/v3/projects/{{ project_id }}/links"
         method: POST
         user: "{{ gns3_user }}"
         password: "{{ gns3_password }}"
@@ -117,7 +117,7 @@
     #  link  (Core Switch)
     - name: Create core infrastructure links
       uri:
-        url: "{{ gns3_server }}/v2/projects/{{ project_id }}/links"
+        url: "{{ gns3_server }}/v3/projects/{{ project_id }}/links"
         method: POST
         user: "{{ gns3_user }}"
         password: "{{ gns3_password }}"

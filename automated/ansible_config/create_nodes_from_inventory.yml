@@ -61,10 +61,10 @@
           No projects found or authentication failed
           {% endif %}
           
-    # Step 3: Try v2 API as fallback
-    - name: Get all projects (v2 no auth)
+    # Step 3: Try v3 API as fallback
+    - name: Get all projects (v3 no auth)
       uri:
-        url: "{{ gns3_server }}/v2/projects"
+        url: "{{ gns3_server }}/v3/projects"
         method: GET
         status_code: [200, 404]
       register: projects_v2
@@ -156,9 +156,9 @@
         - inventory_data.all.children.switches.hosts is defined
       register: created_switches_v3
       
-    - name: Create switches (v2 API)
+    - name: Create switches (v3 API)
       uri:
-        url: "{{ gns3_server }}/v2/projects/{{ project_info.id }}/nodes"
+        url: "{{ gns3_server }}/v3/projects/{{ project_info.id }}/nodes"
         method: POST
         body_format: json
         body:
@@ -197,9 +197,9 @@
         - inventory_data.all.children.pcs.hosts is defined
       register: created_pcs_v3
       
-    - name: Create PC nodes (v2 API)
+    - name: Create PC nodes (v3 API)
       uri:
-        url: "{{ gns3_server }}/v2/projects/{{ project_info.id }}/nodes"
+        url: "{{ gns3_server }}/v3/projects/{{ project_info.id }}/nodes"
         method: POST
         body_format: json
         body:

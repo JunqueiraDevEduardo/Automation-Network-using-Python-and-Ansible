@@ -26,7 +26,7 @@
         
     - name: "Phase 2: Verify project exists"
       uri:
-        url: "{{ gns3_server }}/v2/projects/{{ project_id }}"
+        url: "{{ gns3_server }}/v3/projects/{{ project_id }}"
         method: GET
         user: "{{ gns3_user }}"
         password: "{{ gns3_password }}"
@@ -39,7 +39,7 @@
         
     - name: "Phase 3: Open project if needed"
       uri:
-        url: "{{ gns3_server }}/v2/projects/{{ project_id }}/open"
+        url: "{{ gns3_server }}/v3/projects/{{ project_id }}/open"
         method: POST
         user: "{{ gns3_user }}"
         password: "{{ gns3_password }}"
@@ -73,7 +73,7 @@
       
     - name: "Phase 8: Final verification"
       uri:
-        url: "{{ gns3_server }}/v2/projects/{{ project_id }}/nodes"
+        url: "{{ gns3_server }}/v3/projects/{{ project_id }}/nodes"
         method: GET
         user: "{{ gns3_user }}"
         password: "{{ gns3_password }}"
