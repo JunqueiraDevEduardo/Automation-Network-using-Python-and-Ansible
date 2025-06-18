@@ -1,183 +1,173 @@
 ---
-# Create Network Links in GNS3 using v3 API
-# This playbook creates all network connections between nodes
+# Create Network Links in GNS3 using v3 API Tasks
+# This creates all network connections between nodes
 # Includes: PC-to-Switch, Switch-to-Router, Router-to-Core connections
 
-- name: Create Network Links in GNS3 v3
-  hosts: localhost
-  gather_facts: no
+# Verify we have authentication from parent playbook
+- name: Verify authentication headers exist
+  fail:
+    msg: "No authentication headers found. This playbook should be called from deploy_complete_network.yml"
+  when: auth_headers is not defined
   
+# Get all nodes from the project to build connection mapping
+- name: Get all project nodes
+  uri:
+    url: "{{ gns3_server }}/v3/projects/{{ project_id }}/nodes"
+    method: GET
+    headers: "{{ auth_headers }}"
+  register: all_nodes
+  
+# Create a lookup dictionary for easy node access by name
+- name: Create nodes lookup dictionary
+  set_fact:
+    nodes_dict: "{{ nodes_dict | default({}) | combine({item.name: item}) }}"
+  loop: "{{ all_nodes.json }}"
+  
+# Load network configuration
+- name: Load network configuration
+  include_vars:
+    file: "{{ playbook_dir }}/network_data.yml"
+    name: network_config
+    
+# Debug: Show available nodes
+- name: Display available nodes
+  debug:
+    msg: "Available nodes: {{ nodes_dict.keys() | list | sort }}"
+    verbosity: 1
+
+# Create links between PCs/Servers and their department switches
+- name: Create PC/Server to Switch links
+  uri:
+    url: "{{ gns3_server }}/v3/projects/{{ project_id }}/links"
+    method: POST
+    headers: "{{ auth_headers }}"
+    body_format: json
+    body:
+      nodes:
+        # PC/Server connection (always use port 0)
+        - node_id: "{{ nodes_dict[device.name].node_id }}"
+          adapter_number: 0
+          port_number: 0
+        # Switch connection (use incrementing ports)
+        - node_id: "{{ nodes_dict[dept_switch.name].node_id }}"
+          adapter_number: 0
+          port_number: "{{ pc_port_number }}"
+    status_code: [201, 409]  # 409 if link already exists
+  loop: "{{ network_config.departments | subelements('devices') }}"
+  loop_control:
+    index_var: link_index
+    loop_var: item
   vars:
-    # GNS3 configuration
-    gns3_server: "{{ gns3_server | default('http://127.0.0.1:3080') }}"
-    project_id: "{{ project_id | default('9a8ab49a-6f61-4fa8-9089-99e6c6594e4f') }}"
-    
-  tasks:
-    # Verify we have authentication from parent playbook
-    - name: Verify authentication headers exist
-      fail:
-        msg: "No authentication headers found. This playbook should be called from deploy_complete_network.yml"
-      when: auth_headers is not defined
+    dept: "{{ item.0 }}"
+    device: "{{ item.1 }}"
+    # Find the department switch (not server switches)
+    dept_switch: >-
+      {{ dept.devices | selectattr('type', 'equalto', 'switch') | 
+         rejectattr('name', 'match', '[Ss]erver.*') | list | first }}
+    # Calculate port number for this PC on the switch
+    pc_devices: >-
+      {{ dept.devices | selectattr('type', 'in', ['pc']) | list +
+         dept.devices | selectattr('name', 'match', '.*[Ss]erver.*') | list +
+         dept.devices | selectattr('name', 'match', '.*[Pp]rinter.*') | list }}
+    pc_port_number: >-
+      {{ pc_devices | map(attribute='name') | list | index(device.name) + 1 }}
+  when: 
+    - device.type in ['pc'] or 'server' in device.name.lower() or 'printer' in device.name.lower()
+    - device.name in nodes_dict
+    - dept_switch.name in nodes_dict
+  register: pc_links
+  
+# Create links between department switches and routers
+- name: Create Switch to Router links
+  uri:
+    url: "{{ gns3_server }}/v3/projects/{{ project_id }}/links"
+    method: POST
+    headers: "{{ auth_headers }}"
+    body_format: json
+    body:
+      nodes:
+        # Switch uplink port (use last port)
+        - node_id: "{{ nodes_dict[dept_switch.name].node_id }}"
+          adapter_number: 0
+          port_number: 7  # Using port 7 as uplink
+        # Router port
+        - node_id: "{{ nodes_dict[dept_router.name].node_id }}"
+          adapter_number: 0
+          port_number: 0
+    status_code: [201, 409]
+  loop: "{{ network_config.departments }}"
+  loop_control:
+    loop_var: dept
+    index_var: dept_index
+  vars:
+    # Find department switch and router
+    dept_switch: >-
+      {{ dept.devices | selectattr('type', 'equalto', 'switch') | 
+         rejectattr('name', 'match', '[Ss]erver.*') | list | first | default({}) }}
+    dept_router: >-
+      {{ dept.devices | selectattr('type', 'equalto', 'router') | list | first | default({}) }}
+  when: 
+    - dept_switch.name is defined and dept_switch.name in nodes_dict
+    - dept_router.name is defined and dept_router.name in nodes_dict
+  register: switch_router_links
+  
+# Create links from department routers to core switch
+- name: Create Router to Core Switch links
+  uri:
+    url: "{{ gns3_server }}/v3/projects/{{ project_id }}/links"
+    method: POST
+    headers: "{{ auth_headers }}"
+    body_format: json
+    body:
+      nodes:
+        # Router uplink port
+        - node_id: "{{ nodes_dict[dept_router.name].node_id }}"
+          adapter_number: 0
+          port_number: 0  # Note: VPCS only has one interface
+        # Core switch port
+        - node_id: "{{ nodes_dict['CoreSwitch'].node_id }}"
+          adapter_number: 0
+          port_number: "{{ dept_index }}"
+    status_code: [201, 409]
+  loop: "{{ network_config.departments }}"
+  loop_control:
+    loop_var: dept
+    index_var: dept_index
+  vars:
+    dept_router: >-
+      {{ dept.devices | selectattr('type', 'equalto', 'router') | list | first | default({}) }}
+  when: 
+    - "'CoreSwitch' in nodes_dict"
+    - dept_router.name is defined and dept_router.name in nodes_dict
+    - dept.name == 'Development/Engineering'  # Only connect Dev dept to core for VPCS limitation
+  register: core_links
+  
+# Display link creation summary
+- name: Display links creation summary
+  debug:
+    msg: |
+      Links Creation Summary:
+      =====================
+      PC/Server to Switch links: 
+        - Attempted: {{ pc_links.results | length }}
+        - Created: {{ pc_links.results | selectattr('status', 'defined') | 
+                     selectattr('status', '==', 201) | list | length }}
+        - Already existed: {{ pc_links.results | selectattr('status', 'defined') | 
+                             selectattr('status', '==', 409) | list | length }}
       
-    # Get all nodes from the project to build connection mapping
-    - name: Get all project nodes
-      uri:
-        url: "{{ gns3_server }}/v3/projects/{{ project_id }}/nodes"
-        method: GET
-        headers: "{{ auth_headers }}"
-      register: all_nodes
+      Switch to Router links:
+        - Attempted: {{ switch_router_links.results | length }}
+        - Created: {{ switch_router_links.results | selectattr('status', 'defined') | 
+                     selectattr('status', '==', 201) | list | length }}
+        - Already existed: {{ switch_router_links.results | selectattr('status', 'defined') | 
+                             selectattr('status', '==', 409) | list | length }}
       
-    # Create a lookup dictionary for easy node access by name
-    - name: Create nodes lookup dictionary
-      set_fact:
-        nodes_dict: "{{ nodes_dict | default({}) | combine({item.name: item}) }}"
-      loop: "{{ all_nodes.json }}"
+      Router to Core links:
+        - Attempted: {{ core_links.results | length }}
+        - Created: {{ core_links.results | selectattr('status', 'defined') | 
+                     selectattr('status', '==', 201) | list | length }}
+        - Already existed: {{ core_links.results | selectattr('status', 'defined') | 
+                             selectattr('status', '==', 409) | list | length }}
       
-    # Load network configuration
-    - name: Load network configuration
-      include_vars:
-        file: "{{ playbook_dir }}/../../config/network_data.yml"
-        name: network_config
-        
-    # Debug: Show available nodes
-    - name: Display available nodes
-      debug:
-        msg: "Available nodes: {{ nodes_dict.keys() | list | sort }}"
-        verbosity: 1
-    
-    # Create links between PCs/Servers and their department switches
-    - name: Create PC/Server to Switch links
-      uri:
-        url: "{{ gns3_server }}/v3/projects/{{ project_id }}/links"
-        method: POST
-        headers: "{{ auth_headers }}"
-        body_format: json
-        body:
-          nodes:
-            # PC/Server connection (always use port 0)
-            - node_id: "{{ nodes_dict[device.name].node_id }}"
-              adapter_number: 0
-              port_number: 0
-            # Switch connection (use incrementing ports)
-            - node_id: "{{ nodes_dict[dept_switch.name].node_id }}"
-              adapter_number: 0
-              port_number: "{{ pc_port_number }}"
-        status_code: [201, 409]  # 409 if link already exists
-      loop: "{{ network_config.departments | subelements('devices') }}"
-      loop_control:
-        index_var: link_index
-        loop_var: item
-      vars:
-        dept: "{{ item.0 }}"
-        device: "{{ item.1 }}"
-        # Find the department switch (not server switches)
-        dept_switch: >-
-          {{ dept.devices | selectattr('type', 'equalto', 'switch') | 
-             rejectattr('name', 'match', '[Ss]erver.*') | list | first }}
-        # Calculate port number for this PC on the switch
-        pc_devices: >-
-          {{ dept.devices | selectattr('type', 'in', ['pc']) | list +
-             dept.devices | selectattr('name', 'match', '.*[Ss]erver.*') | list +
-             dept.devices | selectattr('name', 'match', '.*[Pp]rinter.*') | list }}
-        pc_port_number: >-
-          {{ pc_devices | map(attribute='name') | list | index(device.name) + 1 }}
-      when: 
-        - device.type in ['pc'] or 'server' in device.name.lower() or 'printer' in device.name.lower()
-        - device.name in nodes_dict
-        - dept_switch.name in nodes_dict
-      register: pc_links
-      
-    # Create links between department switches and routers
-    - name: Create Switch to Router links
-      uri:
-        url: "{{ gns3_server }}/v3/projects/{{ project_id }}/links"
-        method: POST
-        headers: "{{ auth_headers }}"
-        body_format: json
-        body:
-          nodes:
-            # Switch uplink port (use last port)
-            - node_id: "{{ nodes_dict[dept_switch.name].node_id }}"
-              adapter_number: 0
-              port_number: 7  # Using port 7 as uplink
-            # Router port
-            - node_id: "{{ nodes_dict[dept_router.name].node_id }}"
-              adapter_number: 0
-              port_number: 0
-        status_code: [201, 409]
-      loop: "{{ network_config.departments }}"
-      loop_control:
-        loop_var: dept
-        index_var: dept_index
-      vars:
-        # Find department switch and router
-        dept_switch: >-
-          {{ dept.devices | selectattr('type', 'equalto', 'switch') | 
-             rejectattr('name', 'match', '[Ss]erver.*') | list | first | default({}) }}
-        dept_router: >-
-          {{ dept.devices | selectattr('type', 'equalto', 'router') | list | first | default({}) }}
-      when: 
-        - dept_switch.name is defined and dept_switch.name in nodes_dict
-        - dept_router.name is defined and dept_router.name in nodes_dict
-      register: switch_router_links
-      
-    # Create links from department routers to core switch
-    - name: Create Router to Core Switch links
-      uri:
-        url: "{{ gns3_server }}/v3/projects/{{ project_id }}/links"
-        method: POST
-        headers: "{{ auth_headers }}"
-        body_format: json
-        body:
-          nodes:
-            # Router uplink port
-            - node_id: "{{ nodes_dict[dept_router.name].node_id }}"
-              adapter_number: 0
-              port_number: 0  # Note: VPCS only has one interface
-            # Core switch port
-            - node_id: "{{ nodes_dict['CoreSwitch'].node_id }}"
-              adapter_number: 0
-              port_number: "{{ dept_index }}"
-        status_code: [201, 409]
-      loop: "{{ network_config.departments }}"
-      loop_control:
-        loop_var: dept
-        index_var: dept_index
-      vars:
-        dept_router: >-
-          {{ dept.devices | selectattr('type', 'equalto', 'router') | list | first | default({}) }}
-      when: 
-        - "'CoreSwitch' in nodes_dict"
-        - dept_router.name is defined and dept_router.name in nodes_dict
-        - dept.name == 'Development/Engineering'  # Only connect Dev dept to core for VPCS limitation
-      register: core_links
-      
-    # Display link creation summary
-    - name: Display links creation summary
-      debug:
-        msg: |
-          Links Creation Summary:
-          =====================
-          PC/Server to Switch links: 
-            - Attempted: {{ pc_links.results | length }}
-            - Created: {{ pc_links.results | selectattr('status', 'defined') | 
-                         selectattr('status', '==', 201) | list | length }}
-            - Already existed: {{ pc_links.results | selectattr('status', 'defined') | 
-                                 selectattr('status', '==', 409) | list | length }}
-          
-          Switch to Router links:
-            - Attempted: {{ switch_router_links.results | length }}
-            - Created: {{ switch_router_links.results | selectattr('status', 'defined') | 
-                         selectattr('status', '==', 201) | list | length }}
-            - Already existed: {{ switch_router_links.results | selectattr('status', 'defined') | 
-                                 selectattr('status', '==', 409) | list | length }}
-          
-          Router to Core links:
-            - Attempted: {{ core_links.results | length }}
-            - Created: {{ core_links.results | selectattr('status', 'defined') | 
-                         selectattr('status', '==', 201) | list | length }}
-            - Already existed: {{ core_links.results | selectattr('status', 'defined') | 
-                                 selectattr('status', '==', 409) | list | length }}
-          
-          Total links created: {{ (pc_links.results + switch_router_links.results + core_links.results) | 
-                                 selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
+      Total links created: {{ (pc_links.results + switch_router_links.results + core_links.results) | 
+                             selectattr('status', 'defined') | selectattr('status', '==', 201) | list | length }}
