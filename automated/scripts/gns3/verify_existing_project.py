@@ -1,12 +1,14 @@
-############################################################
-# GNS3 Project Verification Script
-# This script connects to an existing GNS3 project and provides 
-# verification and management capabilities.
-# 
-# Purpose: Verify connection to GNS3 server and existing project
-# Usage: python3 gns3_project_verifier.py
-############################################################
+"""
+Network Automation Verification Script:
+All HTTP codes are here:https://umbraco.com/knowledge-base/http-status-codes/
 
+This script connects to an existing GNS3 project and provides 
+verification and management capabilities.
+Purpose: Verify connection to GNS3 server and existing project
+"""
+##################################
+#Imports
+##################################
 import requests
 import yaml
 import json
@@ -22,7 +24,7 @@ class EnhancedGNS3Builder:
     def __init__(self, 
                  config_file: str = "network_data.yml",
                  gns3_server: str = "http://127.0.0.1:3080",
-                 project_id: str = "9a8ab49a-6f61-4fa8-9089-99e6c6594e4f"):
+                 project_id: str = "9a8ab49a-6f61-4fa8-9089-99e6c6594e4f"): #id of the automated network software companie
         """
         Initialize the GNS3 Builder with project connection parameters.
         
@@ -40,8 +42,8 @@ class EnhancedGNS3Builder:
         self.project_id = project_id
         self.templates = {}  # Store device templates
         
-        # API version detection - see if v2 or v3 is correct below
-        self.api_version = "v2"  # Default to v2, will be updated if v3 is found
+        # API version detection - see if v2 or v3 is correct below in this case the last update is the version 2.
+        self.api_version = "v3"  # Default to v3, will be updated if v3 is found
         
         # Load network configuration from YAML file
         self.load_network_config()
@@ -89,10 +91,11 @@ class EnhancedGNS3Builder:
         # List of potential API endpoints to test for different GNS3 versions
         endpoints_to_test = [
             "/static/web-ui/server/version",    # Web UI server version endpoint
-            "/v2/version",                      # Standard v2 API version endpoint
-            "/v3/version",                      # Standard v3 API version endpoint
+            "/v2/version",                      # Standard v2 API version endpoint Last version
+            "/v3/version",                      # Standard v3 API version endpoint 
             "/version",                         # Generic version endpoint
-            "/api/v2/version",                  # Alternative v2 API path
+            "/api/v2/version",                  # Alternative v2 API path Last Version
+            "/api/v3/version",                  # Alternative v2 API path New Version
             "/"                                 # Root endpoint for basic connectivity
         ]
         

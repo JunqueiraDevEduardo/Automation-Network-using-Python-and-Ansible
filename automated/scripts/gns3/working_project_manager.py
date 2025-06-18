@@ -1,9 +1,12 @@
 """
-Working Project Manager
-Since  existing project works via web UI, let's work with that!
+Network Automation Working Project Manager
+All HTTP codes are here:https://umbraco.com/knowledge-base/http-status-codes/
+
 This bypasses the authentication issue and gets  automation working.
 """
-
+##################################
+#Imports
+##################################
 import requests
 import yaml
 import json
