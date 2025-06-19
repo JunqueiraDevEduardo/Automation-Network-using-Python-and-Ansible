@@ -229,9 +229,13 @@ become_ask_pass = False
                 # Add to department group
                 inventory['all']['children'][dept_group_name]['hosts'][device_name] = device_info
         
-        # Add network devices group
+        # FIXED: Add network devices group with correct dictionary format
         inventory['all']['children']['network_devices'] = {
-            'children': ['switches', 'routers', 'core_infrastructure'],
+            'children': {
+                'switches': {},
+                'routers': {},
+                'core_infrastructure': {}
+            },
             'vars': {
                 'ansible_network_os': 'ios',
                 'ansible_connection': 'network_cli',
@@ -242,9 +246,13 @@ become_ask_pass = False
             }
         }
         
-        # Add end devices group
+        # FIXED: Add end devices group with correct dictionary format
         inventory['all']['children']['end_devices'] = {
-            'children': ['workstations', 'servers', 'printers'],
+            'children': {
+                'workstations': {},
+                'servers': {},
+                'printers': {}
+            },
             'vars': {
                 'ansible_connection': 'ssh',
                 'ansible_user': 'admin',
