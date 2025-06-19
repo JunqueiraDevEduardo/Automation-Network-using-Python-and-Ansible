@@ -1,0 +1,59 @@
+---
+# PC Configuration Tasks
+- name: Configure network interface using netplan (Ubuntu 18.04+)
+  copy:
+    content: |
+      network:
+        version: 2
+        renderer: networkd
+        ethernets:
+          {{ ansible_default_ipv4.interface | default('eth0') }}:
+            addresses:
+              - {{ ansible_host }}/{{ subnet.split('/')[1] }}
+            gateway4: {{ gateway }}
+            nameservers:
+              addresses:
+                - 8.8.8.8
+                - 8.8.4.4
+              search:
+                - company.local
+    dest: /etc/netplan/01-network-config.yaml
+    backup: yes
+  when: 
+    - ansible_os_family == "Debian"
+    - ansible_distribution_major_version|int >= 18
+  notify: apply netplan
+  tags: [network]
+
+- name: Configure network interface (CentOS/RHEL)
+  copy:
+    content: |
+      TYPE=Ethernet
+      BOOTPROTO=static
+      IPADDR={{ ansible_host }}
+      NETMASK=255.255.255.0
+      GATEWAY={{ gateway }}
+      DNS1=8.8.8.8
+      DNS2=8.8.4.4
+      ONBOOT=yes
+    dest: "/etc/sysconfig/network-scripts/ifcfg-{{ ansible_default_ipv4.interface | default('eth0') }}"
+    backup: yes
+  when: ansible_os_family == "RedHat"
+  notify: restart network
+  tags: [network]
+
+- name: Install basic packages
+  package:
+    name: "{{ basic_packages }}"
+    state: present
+  tags: [packages]
+
+- name: Configure DNS resolver
+  copy:
+    content: |
+      nameserver 8.8.8.8
+      nameserver 8.8.4.4
+      search company.local
+    dest: /etc/resolv.conf
+    backup: yes
+  tags: [dns]

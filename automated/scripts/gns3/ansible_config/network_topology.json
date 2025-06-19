@@ -1,0 +1,715 @@
+{
+  "departments": [
+    {
+      "name": "Development/Engineering",
+      "vlan": 10,
+      "subnet": "192.168.10.0/28",
+      "gateway": "192.168.10.1",
+      "devices": [
+        {
+          "type": "switch",
+          "name": "SW-10-DEV",
+          "ip": "192.168.10.2"
+        },
+        {
+          "type": "pc",
+          "name": "PC-2-10",
+          "ip": "192.168.10.3"
+        },
+        {
+          "type": "pc",
+          "name": "PC-3-10",
+          "ip": "192.168.10.4"
+        },
+        {
+          "type": "pc",
+          "name": "PC-4-10",
+          "ip": "192.168.10.5"
+        },
+        {
+          "type": "pc",
+          "name": "PC-5-10",
+          "ip": "192.168.10.6"
+        },
+        {
+          "type": "pc",
+          "name": "PC-6-10",
+          "ip": "192.168.10.7"
+        },
+        {
+          "type": "router",
+          "name": "R-10-A",
+          "ip": "192.168.10.1"
+        },
+        {
+          "type": "switch",
+          "name": "Server-1-10",
+          "ip": "192.168.10.8"
+        }
+      ]
+    },
+    {
+      "name": "Guest Network",
+      "vlan": 20,
+      "subnet": "192.168.20.0/28",
+      "gateway": "192.168.20.1",
+      "devices": [
+        {
+          "type": "switch",
+          "name": "SW-20-GUEST",
+          "ip": "192.168.20.2"
+        },
+        {
+          "type": "pc",
+          "name": "PC-2-20",
+          "ip": "192.168.20.3"
+        },
+        {
+          "type": "pc",
+          "name": "PC-3-20",
+          "ip": "192.168.20.4"
+        },
+        {
+          "type": "pc",
+          "name": "PC-4-20",
+          "ip": "192.168.20.5"
+        },
+        {
+          "type": "pc",
+          "name": "PC-5-20",
+          "ip": "192.168.20.6"
+        },
+        {
+          "type": "router",
+          "name": "R-20-D",
+          "ip": "192.168.20.1"
+        }
+      ]
+    },
+    {
+      "name": "IT Network",
+      "vlan": 30,
+      "subnet": "192.168.30.0/28",
+      "gateway": "192.168.30.1",
+      "devices": [
+        {
+          "type": "switch",
+          "name": "SW-30-IT",
+          "ip": "192.168.30.2"
+        },
+        {
+          "type": "pc",
+          "name": "PC-2-30",
+          "ip": "192.168.30.3"
+        },
+        {
+          "type": "pc",
+          "name": "PC-3-30",
+          "ip": "192.168.30.4"
+        },
+        {
+          "type": "pc",
+          "name": "PC-4-30",
+          "ip": "192.168.30.5"
+        },
+        {
+          "type": "pc",
+          "name": "PC-5-30",
+          "ip": "192.168.30.6"
+        },
+        {
+          "type": "pc",
+          "name": "PC-6-30",
+          "ip": "192.168.30.7"
+        },
+        {
+          "type": "router",
+          "name": "R-30-B",
+          "ip": "192.168.30.1"
+        },
+        {
+          "type": "switch",
+          "name": "Server-1-30",
+          "ip": "192.168.30.8"
+        }
+      ]
+    },
+    {
+      "name": "Sales and Marketing",
+      "vlan": 40,
+      "subnet": "192.168.40.0/29",
+      "gateway": "192.168.40.1",
+      "devices": [
+        {
+          "type": "switch",
+          "name": "SW-40-SALES",
+          "ip": "192.168.40.2"
+        },
+        {
+          "type": "pc",
+          "name": "PC-2-40",
+          "ip": "192.168.40.3"
+        },
+        {
+          "type": "pc",
+          "name": "PC-3-40",
+          "ip": "192.168.40.4"
+        },
+        {
+          "type": "pc",
+          "name": "printer-1-40",
+          "ip": "192.168.40.5"
+        },
+        {
+          "type": "router",
+          "name": "R-40-C",
+          "ip": "192.168.40.1"
+        }
+      ]
+    },
+    {
+      "name": "Admin Department",
+      "vlan": 50,
+      "subnet": "192.168.50.0/29",
+      "gateway": "192.168.50.1",
+      "devices": [
+        {
+          "type": "switch",
+          "name": "SW-50-ADMIN",
+          "ip": "192.168.50.2"
+        },
+        {
+          "type": "pc",
+          "name": "PC-2-50",
+          "ip": "192.168.50.3"
+        },
+        {
+          "type": "router",
+          "name": "R-50-H",
+          "ip": "192.168.50.1"
+        }
+      ]
+    },
+    {
+      "name": "Human Resource Management",
+      "vlan": 60,
+      "subnet": "192.168.60.0/29",
+      "gateway": "192.168.60.1",
+      "devices": [
+        {
+          "type": "switch",
+          "name": "SW-60-HR",
+          "ip": "192.168.60.2"
+        },
+        {
+          "type": "pc",
+          "name": "PC-2-60",
+          "ip": "192.168.60.3"
+        },
+        {
+          "type": "pc",
+          "name": "printer-1-60",
+          "ip": "192.168.60.4"
+        },
+        {
+          "type": "router",
+          "name": "R-60-E",
+          "ip": "192.168.60.1"
+        }
+      ]
+    },
+    {
+      "name": "Accounts and Finance",
+      "vlan": 70,
+      "subnet": "192.168.70.0/29",
+      "gateway": "192.168.70.1",
+      "devices": [
+        {
+          "type": "switch",
+          "name": "SW-70-FINANCE",
+          "ip": "192.168.70.2"
+        },
+        {
+          "type": "pc",
+          "name": "PC-2-70",
+          "ip": "192.168.70.3"
+        },
+        {
+          "type": "pc",
+          "name": "server-1-70",
+          "ip": "192.168.70.4"
+        },
+        {
+          "type": "router",
+          "name": "R-70-E",
+          "ip": "192.168.70.1"
+        }
+      ]
+    },
+    {
+      "name": "Design",
+      "vlan": 80,
+      "subnet": "192.168.80.0/29",
+      "gateway": "192.168.80.1",
+      "devices": [
+        {
+          "type": "switch",
+          "name": "SW-80-DESIGN",
+          "ip": "192.168.80.2"
+        },
+        {
+          "type": "pc",
+          "name": "PC-2-80",
+          "ip": "192.168.80.3"
+        },
+        {
+          "type": "router",
+          "name": "R-80-J",
+          "ip": "192.168.80.1"
+        }
+      ]
+    },
+    {
+      "name": "Marketing",
+      "vlan": 90,
+      "subnet": "192.168.90.0/29",
+      "gateway": "192.168.90.1",
+      "devices": [
+        {
+          "type": "switch",
+          "name": "SW-90-MARKETING",
+          "ip": "192.168.90.2"
+        },
+        {
+          "type": "pc",
+          "name": "PC-2-90",
+          "ip": "192.168.90.3"
+        },
+        {
+          "type": "router",
+          "name": "R-90-I",
+          "ip": "192.168.90.1"
+        }
+      ]
+    },
+    {
+      "name": "Infrastructure & Security",
+      "vlan": 100,
+      "subnet": "192.168.0.0/23",
+      "gateway": "192.168.0.1",
+      "devices": [
+        {
+          "type": "switch",
+          "name": "SW-100-INFRA",
+          "ip": "192.168.0.8"
+        },
+        {
+          "type": "pc",
+          "name": "PC-2-100",
+          "ip": "192.168.0.9"
+        },
+        {
+          "type": "pc",
+          "name": "PC-3-100",
+          "ip": "192.168.0.10"
+        },
+        {
+          "type": "pc",
+          "name": "PC-4-100",
+          "ip": "192.168.0.11"
+        },
+        {
+          "type": "router",
+          "name": "R-100-G",
+          "ip": "192.168.0.1"
+        },
+        {
+          "type": "switch",
+          "name": "Server-1-100",
+          "ip": "192.168.0.2"
+        },
+        {
+          "type": "switch",
+          "name": "Server-2-100",
+          "ip": "192.168.0.3"
+        },
+        {
+          "type": "switch",
+          "name": "Server-3-100",
+          "ip": "192.168.0.4"
+        },
+        {
+          "type": "switch",
+          "name": "Server-4-100",
+          "ip": "192.168.0.5"
+        },
+        {
+          "type": "switch",
+          "name": "Server-5-100",
+          "ip": "192.168.0.6"
+        },
+        {
+          "type": "switch",
+          "name": "Server-6-100",
+          "ip": "192.168.0.7"
+        }
+      ]
+    }
+  ],
+  "core_infrastructure": [
+    {
+      "type": "switch",
+      "name": "CoreSwitch",
+      "ip": "192.168.1.2",
+      "description": "Main core switch connecting all department routers"
+    }
+  ],
+  "total_devices": 56,
+  "ip_assignments": {
+    "Development/Engineering": {
+      "vlan": 10,
+      "subnet": "192.168.10.0/28",
+      "gateway": "192.168.10.1",
+      "devices": [
+        {
+          "name": "SW-10-DEV",
+          "type": "switch",
+          "ip": "192.168.10.2"
+        },
+        {
+          "name": "PC-2-10",
+          "type": "pc",
+          "ip": "192.168.10.3"
+        },
+        {
+          "name": "PC-3-10",
+          "type": "pc",
+          "ip": "192.168.10.4"
+        },
+        {
+          "name": "PC-4-10",
+          "type": "pc",
+          "ip": "192.168.10.5"
+        },
+        {
+          "name": "PC-5-10",
+          "type": "pc",
+          "ip": "192.168.10.6"
+        },
+        {
+          "name": "PC-6-10",
+          "type": "pc",
+          "ip": "192.168.10.7"
+        },
+        {
+          "name": "R-10-A",
+          "type": "router",
+          "ip": "192.168.10.1"
+        },
+        {
+          "name": "Server-1-10",
+          "type": "switch",
+          "ip": "192.168.10.8"
+        }
+      ]
+    },
+    "Guest Network": {
+      "vlan": 20,
+      "subnet": "192.168.20.0/28",
+      "gateway": "192.168.20.1",
+      "devices": [
+        {
+          "name": "SW-20-GUEST",
+          "type": "switch",
+          "ip": "192.168.20.2"
+        },
+        {
+          "name": "PC-2-20",
+          "type": "pc",
+          "ip": "192.168.20.3"
+        },
+        {
+          "name": "PC-3-20",
+          "type": "pc",
+          "ip": "192.168.20.4"
+        },
+        {
+          "name": "PC-4-20",
+          "type": "pc",
+          "ip": "192.168.20.5"
+        },
+        {
+          "name": "PC-5-20",
+          "type": "pc",
+          "ip": "192.168.20.6"
+        },
+        {
+          "name": "R-20-D",
+          "type": "router",
+          "ip": "192.168.20.1"
+        }
+      ]
+    },
+    "IT Network": {
+      "vlan": 30,
+      "subnet": "192.168.30.0/28",
+      "gateway": "192.168.30.1",
+      "devices": [
+        {
+          "name": "SW-30-IT",
+          "type": "switch",
+          "ip": "192.168.30.2"
+        },
+        {
+          "name": "PC-2-30",
+          "type": "pc",
+          "ip": "192.168.30.3"
+        },
+        {
+          "name": "PC-3-30",
+          "type": "pc",
+          "ip": "192.168.30.4"
+        },
+        {
+          "name": "PC-4-30",
+          "type": "pc",
+          "ip": "192.168.30.5"
+        },
+        {
+          "name": "PC-5-30",
+          "type": "pc",
+          "ip": "192.168.30.6"
+        },
+        {
+          "name": "PC-6-30",
+          "type": "pc",
+          "ip": "192.168.30.7"
+        },
+        {
+          "name": "R-30-B",
+          "type": "router",
+          "ip": "192.168.30.1"
+        },
+        {
+          "name": "Server-1-30",
+          "type": "switch",
+          "ip": "192.168.30.8"
+        }
+      ]
+    },
+    "Sales and Marketing": {
+      "vlan": 40,
+      "subnet": "192.168.40.0/29",
+      "gateway": "192.168.40.1",
+      "devices": [
+        {
+          "name": "SW-40-SALES",
+          "type": "switch",
+          "ip": "192.168.40.2"
+        },
+        {
+          "name": "PC-2-40",
+          "type": "pc",
+          "ip": "192.168.40.3"
+        },
+        {
+          "name": "PC-3-40",
+          "type": "pc",
+          "ip": "192.168.40.4"
+        },
+        {
+          "name": "printer-1-40",
+          "type": "pc",
+          "ip": "192.168.40.5"
+        },
+        {
+          "name": "R-40-C",
+          "type": "router",
+          "ip": "192.168.40.1"
+        }
+      ]
+    },
+    "Admin Department": {
+      "vlan": 50,
+      "subnet": "192.168.50.0/29",
+      "gateway": "192.168.50.1",
+      "devices": [
+        {
+          "name": "SW-50-ADMIN",
+          "type": "switch",
+          "ip": "192.168.50.2"
+        },
+        {
+          "name": "PC-2-50",
+          "type": "pc",
+          "ip": "192.168.50.3"
+        },
+        {
+          "name": "R-50-H",
+          "type": "router",
+          "ip": "192.168.50.1"
+        }
+      ]
+    },
+    "Human Resource Management": {
+      "vlan": 60,
+      "subnet": "192.168.60.0/29",
+      "gateway": "192.168.60.1",
+      "devices": [
+        {
+          "name": "SW-60-HR",
+          "type": "switch",
+          "ip": "192.168.60.2"
+        },
+        {
+          "name": "PC-2-60",
+          "type": "pc",
+          "ip": "192.168.60.3"
+        },
+        {
+          "name": "printer-1-60",
+          "type": "pc",
+          "ip": "192.168.60.4"
+        },
+        {
+          "name": "R-60-E",
+          "type": "router",
+          "ip": "192.168.60.1"
+        }
+      ]
+    },
+    "Accounts and Finance": {
+      "vlan": 70,
+      "subnet": "192.168.70.0/29",
+      "gateway": "192.168.70.1",
+      "devices": [
+        {
+          "name": "SW-70-FINANCE",
+          "type": "switch",
+          "ip": "192.168.70.2"
+        },
+        {
+          "name": "PC-2-70",
+          "type": "pc",
+          "ip": "192.168.70.3"
+        },
+        {
+          "name": "server-1-70",
+          "type": "pc",
+          "ip": "192.168.70.4"
+        },
+        {
+          "name": "R-70-E",
+          "type": "router",
+          "ip": "192.168.70.1"
+        }
+      ]
+    },
+    "Design": {
+      "vlan": 80,
+      "subnet": "192.168.80.0/29",
+      "gateway": "192.168.80.1",
+      "devices": [
+        {
+          "name": "SW-80-DESIGN",
+          "type": "switch",
+          "ip": "192.168.80.2"
+        },
+        {
+          "name": "PC-2-80",
+          "type": "pc",
+          "ip": "192.168.80.3"
+        },
+        {
+          "name": "R-80-J",
+          "type": "router",
+          "ip": "192.168.80.1"
+        }
+      ]
+    },
+    "Marketing": {
+      "vlan": 90,
+      "subnet": "192.168.90.0/29",
+      "gateway": "192.168.90.1",
+      "devices": [
+        {
+          "name": "SW-90-MARKETING",
+          "type": "switch",
+          "ip": "192.168.90.2"
+        },
+        {
+          "name": "PC-2-90",
+          "type": "pc",
+          "ip": "192.168.90.3"
+        },
+        {
+          "name": "R-90-I",
+          "type": "router",
+          "ip": "192.168.90.1"
+        }
+      ]
+    },
+    "Infrastructure & Security": {
+      "vlan": 100,
+      "subnet": "192.168.0.0/23",
+      "gateway": "192.168.0.1",
+      "devices": [
+        {
+          "name": "SW-100-INFRA",
+          "type": "switch",
+          "ip": "192.168.0.8"
+        },
+        {
+          "name": "PC-2-100",
+          "type": "pc",
+          "ip": "192.168.0.9"
+        },
+        {
+          "name": "PC-3-100",
+          "type": "pc",
+          "ip": "192.168.0.10"
+        },
+        {
+          "name": "PC-4-100",
+          "type": "pc",
+          "ip": "192.168.0.11"
+        },
+        {
+          "name": "R-100-G",
+          "type": "router",
+          "ip": "192.168.0.1"
+        },
+        {
+          "name": "Server-1-100",
+          "type": "switch",
+          "ip": "192.168.0.2"
+        },
+        {
+          "name": "Server-2-100",
+          "type": "switch",
+          "ip": "192.168.0.3"
+        },
+        {
+          "name": "Server-3-100",
+          "type": "switch",
+          "ip": "192.168.0.4"
+        },
+        {
+          "name": "Server-4-100",
+          "type": "switch",
+          "ip": "192.168.0.5"
+        },
+        {
+          "name": "Server-5-100",
+          "type": "switch",
+          "ip": "192.168.0.6"
+        },
+        {
+          "name": "Server-6-100",
+          "type": "switch",
+          "ip": "192.168.0.7"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,104 @@
+switch_interfaces:
+- access:
+    vlan: 1
+  name: FastEthernet0/1
+- access:
+    vlan: 1
+  name: FastEthernet0/2
+- access:
+    vlan: 1
+  name: FastEthernet0/3
+- access:
+    vlan: 1
+  name: FastEthernet0/4
+- access:
+    vlan: 1
+  name: FastEthernet0/5
+- access:
+    vlan: 1
+  name: FastEthernet0/6
+- access:
+    vlan: 1
+  name: FastEthernet0/7
+- access:
+    vlan: 1
+  name: FastEthernet0/8
+- access:
+    vlan: 1
+  name: FastEthernet0/9
+- access:
+    vlan: 1
+  name: FastEthernet0/10
+- access:
+    vlan: 1
+  name: FastEthernet0/11
+- access:
+    vlan: 1
+  name: FastEthernet0/12
+- access:
+    vlan: 1
+  name: FastEthernet0/13
+- access:
+    vlan: 1
+  name: FastEthernet0/14
+- access:
+    vlan: 1
+  name: FastEthernet0/15
+- access:
+    vlan: 1
+  name: FastEthernet0/16
+- access:
+    vlan: 1
+  name: FastEthernet0/17
+- access:
+    vlan: 1
+  name: FastEthernet0/18
+- access:
+    vlan: 1
+  name: FastEthernet0/19
+- access:
+    vlan: 1
+  name: FastEthernet0/20
+- access:
+    vlan: 1
+  name: FastEthernet0/21
+- access:
+    vlan: 1
+  name: FastEthernet0/22
+- access:
+    vlan: 1
+  name: FastEthernet0/23
+- access:
+    vlan: 1
+  name: FastEthernet0/24
+vlans_config:
+- name: Development-Engineering
+  state: active
+  vlan_id: 10
+- name: Guest-Network
+  state: active
+  vlan_id: 20
+- name: IT-Network
+  state: active
+  vlan_id: 30
+- name: Sales-and-Marketing
+  state: active
+  vlan_id: 40
+- name: Admin-Department
+  state: active
+  vlan_id: 50
+- name: Human-Resource-Management
+  state: active
+  vlan_id: 60
+- name: Accounts-and-Finance
+  state: active
+  vlan_id: 70
+- name: Design
+  state: active
+  vlan_id: 80
+- name: Marketing
+  state: active
+  vlan_id: 90
+- name: Infrastructure-and-Security
+  state: active
+  vlan_id: 100

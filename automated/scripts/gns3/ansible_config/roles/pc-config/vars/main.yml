@@ -1,0 +1,8 @@
+basic_packages:
+- curl
+- wget
+- net-tools
+- openssh-server
+- htop
+- vim
+- git

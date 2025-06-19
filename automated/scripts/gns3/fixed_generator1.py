@@ -1,0 +1,1157 @@
+
+# Import required libraries for file system operations, data handling, and path management
+import os
+import yaml
+import json
+from pathlib import Path
+from typing import Dict, List, Any
+
+class NetworkRepositorySetup:
+    """
+    Comprehensive repository setup class that creates the complete directory structure
+    and all necessary configuration files for a network automation project.
+    Generates Ansible configurations, roles, playbooks, and deployment scripts.
+    """
+    
+    def __init__(self, base_path: str = "."):
+        """
+        Initialize the repository setup with base path and automated subdirectory.
+        Creates the foundational directory structure upon initialization.
+        """
+        self.base_path = Path(base_path)  # Convert string path to Path object
+        self.automated_path = self.base_path / "automated"  # Main automation directory
+        
+        # Create the complete directory structure immediately
+        self.create_directory_structure()
+        
+    def create_directory_structure(self):
+        """
+        Create the complete directory structure for the network automation repository.
+        Establishes all necessary folders for Ansible roles, inventories, scripts, and documentation.
+        """
+        # Define complete directory structure for network automation project
+        dirs = [
+            # Ansible inventory directories for different environments
+            "automated/ansible/inventories/production",   # Production network inventory
+            "automated/ansible/inventories/staging",      # Staging environment inventory
+            "automated/ansible/inventories/development",  # Development environment inventory
+            
+            # Ansible playbooks directory
+            "automated/ansible/playbooks",                # Custom playbooks storage
+            
+            # Ansible roles for different device types
+            "automated/ansible/roles/switch-config/tasks",     # Switch configuration tasks
+            "automated/ansible/roles/switch-config/templates", # Switch Jinja2 templates
+            "automated/ansible/roles/switch-config/vars",      # Switch variables
+            "automated/ansible/roles/router-config/tasks",     # Router configuration tasks
+            "automated/ansible/roles/router-config/templates", # Router Jinja2 templates
+            "automated/ansible/roles/router-config/vars",      # Router variables
+            "automated/ansible/roles/pc-config/tasks",         # PC configuration tasks
+            "automated/ansible/roles/pc-config/templates",     # PC configuration templates
+            
+            # Ansible variable directories
+            "automated/ansible/group_vars",    # Group-specific variables
+            "automated/ansible/host_vars",     # Host-specific variables
+            
+            # Automation scripts directories
+            "automated/scripts/deployment",    # Deployment automation scripts
+            "automated/scripts/monitoring",    # Network monitoring scripts
+            "automated/scripts/backup",        # Configuration backup scripts
+            
+            # Configuration and documentation
+            "automated/config/environments",   # Environment-specific configurations
+            "automated/docs",                  # Project documentation
+            "automated/tests"                  # Testing scripts and configurations
+        ]
+        
+        # Create each directory with parent directories as needed
+        for dir_path in dirs:
+            (self.base_path / dir_path).mkdir(parents=True, exist_ok=True)
+            
+        print(f"Created directory structure")
+
+    def create_ansible_config(self):
+        """
+        Create the main ansible.cfg configuration file with optimized settings.
+        Configures Ansible behavior, connection parameters, and performance options.
+        """
+        # Comprehensive Ansible configuration with performance and security settings
+        config_content = """[defaults]
+[defaults]
+# Basic Configuration
+inventory = inventories/production/hosts.ini
+remote_user = admin
+# Location of inventory file
+inventory = ./inventory.yml
+
+# SSH host key checking - disabled for automation
+host_key_checking = False
+
+# Connection timeout in seconds
+timeout = 30
+
+# Fact gathering - disabled by default for network devices
+gathering = explicit
+gather_facts = False
+
+# Output Configuration  
+# Output formatting
+stdout_callback = yaml
+display_skipped_hosts = False
+display_ok_hosts = True
+
+# Performance Settings - optimize for network operations
+forks = 10
+poll_interval = 2
+
+# Logging Configuration
+log_path = /var/log/ansible.log
+
+# SSH Connection Optimization
+[ssh_connection]
+ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no
+pipelining = True
+control_path = /tmp/ansible-ssh-%%h-%%p-%%r
+
+# Privilege Escalation for Network Devices
+[privilege_escalation]
+become = True
+become_method = enable
+become_user = admin
+become_ask_pass = False
+
+# Connection Plugin Settings
+[connection]
+host_key_checking = False
+
+# Inventory Plugin Configuration
+[inventory]
+enable_plugins = host_list, script, auto, yaml, ini, toml
+"""
+        
+        # Write ansible.cfg to the ansible directory
+        config_path = self.automated_path / "ansible" / "ansible.cfg"
+        with open(config_path, 'w') as f:
+            f.write(config_content)
+        print(f"Created ansible.cfg")
+
+    def create_production_inventory(self):
+        """
+        Create comprehensive production inventory with all departments and devices.
+        Defines network topology including core infrastructure, department switches,
+        workstations, and servers with proper VLAN assignments and IP addressing.
+        """
+        # Complete production network inventory with 10 departments
+        inventory_content = """# Production Network Inventory
+# Software Company Network - 10 Departments
+
+# Core network infrastructure devices
+[core_infrastructure]
+core-switch ansible_host=192.168.1.1 device_type=switch
+core-router ansible_host=192.168.1.254 device_type=router
+
+# Department-specific network switches with VLAN assignments
+[department_switches]
+# Development Engineering - VLAN 10
+sw-dev-a ansible_host=192.168.10.1 department=development vlan_id=10
+
+# Guest Network - VLAN 20  
+sw-guest-d ansible_host=192.168.20.1 department=guest vlan_id=20
+
+# IT Network - VLAN 30
+sw-it-b ansible_host=192.168.30.1 department=it vlan_id=30
+
+# Sales Marketing - VLAN 40
+sw-sales-c ansible_host=192.168.40.1 department=sales vlan_id=40
+
+# Admin Department - VLAN 50
+sw-admin-h ansible_host=192.168.50.1 department=admin vlan_id=50
+
+# Human Resources - VLAN 60
+sw-hr-f ansible_host=192.168.60.1 department=hr vlan_id=60
+
+# Accounts Finance - VLAN 70
+sw-finance-e ansible_host=192.168.70.1 department=finance vlan_id=70
+
+# Design Department - VLAN 80
+sw-design-j ansible_host=192.168.80.1 department=design vlan_id=80
+
+# Marketing Department - VLAN 90
+sw-marketing-i ansible_host=192.168.90.1 department=marketing vlan_id=90
+
+# Infrastructure Security - VLAN 100
+sw-infra-g ansible_host=192.168.0.1 department=infrastructure vlan_id=100
+
+# End-user workstations organized by department
+[workstations]
+# Development Engineering PCs
+pc-dev-01 ansible_host=192.168.10.2 department=development vlan_id=10
+pc-dev-02 ansible_host=192.168.10.3 department=development vlan_id=10
+pc-dev-03 ansible_host=192.168.10.4 department=development vlan_id=10
+pc-dev-04 ansible_host=192.168.10.5 department=development vlan_id=10
+pc-dev-05 ansible_host=192.168.10.6 department=development vlan_id=10
+pc-dev-06 ansible_host=192.168.10.7 department=development vlan_id=10
+
+# Guest Network PCs
+pc-guest-01 ansible_host=192.168.20.2 department=guest vlan_id=20
+pc-guest-02 ansible_host=192.168.20.3 department=guest vlan_id=20
+pc-guest-03 ansible_host=192.168.20.4 department=guest vlan_id=20
+pc-guest-04 ansible_host=192.168.20.5 department=guest vlan_id=20
+pc-guest-05 ansible_host=192.168.20.6 department=guest vlan_id=20
+
+# IT Network PCs
+pc-it-01 ansible_host=192.168.30.2 department=it vlan_id=30
+pc-it-02 ansible_host=192.168.30.3 department=it vlan_id=30
+pc-it-03 ansible_host=192.168.30.4 department=it vlan_id=30
+pc-it-04 ansible_host=192.168.30.5 department=it vlan_id=30
+pc-it-05 ansible_host=192.168.30.6 department=it vlan_id=30
+pc-it-06 ansible_host=192.168.30.7 department=it vlan_id=30
+
+# Server infrastructure organized by department
+[servers]
+# Development Servers
+srv-dev-01 ansible_host=192.168.10.8 department=development vlan_id=10
+
+# Infrastructure Servers
+srv-infra-01 ansible_host=192.168.0.2 department=infrastructure vlan_id=100
+srv-infra-02 ansible_host=192.168.0.3 department=infrastructure vlan_id=100
+srv-infra-03 ansible_host=192.168.0.4 department=infrastructure vlan_id=100
+srv-infra-04 ansible_host=192.168.0.5 department=infrastructure vlan_id=100
+srv-infra-05 ansible_host=192.168.0.6 department=infrastructure vlan_id=100
+srv-infra-06 ansible_host=192.168.0.7 department=infrastructure vlan_id=100
+
+# Finance Server
+srv-finance-01 ansible_host=192.168.70.4 department=finance vlan_id=70
+
+# Group definitions for easier targeting
+[network_devices:children]
+core_infrastructure
+department_switches
+
+[end_devices:children]
+workstations
+servers
+
+# Global variables applied to all hosts
+[all:vars]
+# Default connection parameters for network devices
+ansible_user=admin
+ansible_password=admin
+ansible_network_os=ios
+ansible_connection=network_cli
+ansible_become=yes
+ansible_become_method=enable
+ansible_python_interpreter=/usr/bin/python3
+
+# Department-specific VLAN and network configurations
+[development:children]
+[development:vars]
+vlan_id=10
+network=192.168.10.0/28
+gateway=192.168.10.1
+
+[guest:children] 
+[guest:vars]
+vlan_id=20
+network=192.168.20.0/28
+gateway=192.168.20.1
+
+[it:children]
+[it:vars]
+vlan_id=30
+network=192.168.30.0/28
+gateway=192.168.30.1
+
+[sales:children]
+[sales:vars]
+vlan_id=40
+network=192.168.40.0/29
+gateway=192.168.40.1
+
+[admin:children]
+[admin:vars]
+vlan_id=50
+network=192.168.50.0/29
+gateway=192.168.50.1
+
+[hr:children]
+[hr:vars]
+vlan_id=60
+network=192.168.60.0/29
+gateway=192.168.60.1
+
+[finance:children]
+[finance:vars]
+vlan_id=70
+network=192.168.70.0/29
+gateway=192.168.70.1
+
+[design:children]
+[design:vars]
+vlan_id=80
+network=192.168.80.0/29
+gateway=192.168.80.1
+
+[marketing:children]
+[marketing:vars]
+vlan_id=90
+network=192.168.90.0/29
+gateway=192.168.90.1
+# Python interpreter path
+interpreter_python = /usr/bin/python3
+
+[infrastructure:children]
+[infrastructure:vars]
+vlan_id=100
+network=192.168.0.0/28
+gateway=192.168.0.1
+"""
+        
+        # Write inventory file to production directory
+        inventory_path = self.automated_path / "ansible" / "inventories" / "production" / "hosts.ini"
+        with open(inventory_path, 'w') as f:
+            f.write(inventory_content)
+        print(f"Created production inventory")
+# Disable various warnings
+deprecation_warnings = False
+command_warnings = False
+system_warnings = False
+
+    def create_switch_role(self):
+        """
+        Create comprehensive Ansible role for switch configuration.
+        Includes tasks, templates, and variables for VLAN and interface configuration.
+        """
+        
+        # Main tasks file for switch configuration
+        main_tasks = """---
+# Switch Configuration Tasks
+- name: Configure VLANs
+  cisco.ios.ios_vlans:
+    config: "{{ vlans }}"
+    state: merged
+  tags: [vlans]
+# Retry files configuration
+retry_files_enabled = True
+retry_files_save_path = ./ansible-retry
+
+- name: Configure interfaces
+  cisco.ios.ios_l2_interfaces:
+    config: "{{ switch_interfaces }}"
+    state: merged
+  tags: [interfaces]
+# Ansible modules path (if custom modules are used)
+# library = ./library
+
+- name: Configure trunk ports
+  cisco.ios.ios_l2_interfaces:
+    config: "{{ trunk_interfaces }}"
+    state: merged
+  when: trunk_interfaces is defined
+  tags: [trunks]
+# Roles path
+# roles_path = ./roles
+
+- name: Apply switch configuration template
+  cisco.ios.ios_config:
+    src: switch-base.j2
+  tags: [base_config]
+# Host pattern matching
+host_pattern_mismatch = error
+
+- name: Save configuration
+  cisco.ios.ios_config:
+    save_when: always
+  tags: [save]
+"""
+        
+        # Write switch tasks file
+        tasks_path = self.automated_path / "ansible" / "roles" / "switch-config" / "tasks" / "main.yml"
+        with open(tasks_path, 'w') as f:
+            f.write(main_tasks)
+# Task includes
+# task_includes_static = True
+
+        # Jinja2 template for switch base configuration
+        switch_template = """!
+! Switch Base Configuration Template
+! Generated by Ansible
+!
+hostname {{ inventory_hostname }}
+!
+! Enable SSH and management services
+ip domain-name {{ domain_name | default('company.local') }}
+crypto key generate rsa modulus 1024
+ip ssh version 2
+!
+! Management interface configuration
+interface vlan1
+ ip address {{ ansible_host }} 255.255.255.0
+ no shutdown
+!
+! Default gateway for management
+ip default-gateway {{ management_gateway | default('192.168.1.254') }}
+!
+! Enable password encryption service
+service password-encryption
+!
+! SNMP Configuration for monitoring
+snmp-server community {{ snmp_community | default('public') }} RO
+snmp-server contact {{ snmp_contact | default('admin@company.com') }}
+snmp-server location {{ snmp_location | default('Data Center') }}
+!
+! Security configuration
+enable secret {{ enable_password | default('admin') }}
+username {{ ansible_user }} privilege 15 secret {{ ansible_password }}
+!
+! Remote access configuration
+line vty 0 15
+ login local
+ transport input ssh
+!
+"""
+        
+        # Write switch template file
+        template_path = self.automated_path / "ansible" / "roles" / "switch-config" / "templates" / "switch-base.j2"
+        with open(template_path, 'w') as f:
+            f.write(switch_template)
+
+        # Variables file for switch configuration
+        switch_vars = """---
+# Switch Configuration Variables
+
+# VLAN Configuration - defines all department VLANs
+vlans:
+  - vlan_id: 10
+    name: "Development-Engineering"
+    state: active
+  - vlan_id: 20
+    name: "Guest-Network"
+    state: active
+  - vlan_id: 30
+    name: "IT-Network"
+    state: active
+  - vlan_id: 40
+    name: "Sales-Marketing"
+    state: active
+  - vlan_id: 50
+    name: "Admin-Department"
+    state: active
+  - vlan_id: 60
+    name: "Human-Resources"
+    state: active
+  - vlan_id: 70
+    name: "Accounts-Finance"
+    state: active
+  - vlan_id: 80
+    name: "Design-Department"
+    state: active
+  - vlan_id: 90
+    name: "Marketing-Department"
+    state: active
+  - vlan_id: 100
+    name: "Infrastructure-Security"
+    state: active
+
+# Interface Configuration - access ports for end devices
+switch_interfaces:
+  - name: FastEthernet0/1
+    access:
+      vlan: "{{ vlan_id | default(1) }}"
+  - name: FastEthernet0/2
+    access:
+      vlan: "{{ vlan_id | default(1) }}"
+  - name: FastEthernet0/3
+    access:
+      vlan: "{{ vlan_id | default(1) }}"
+  - name: FastEthernet0/4
+    access:
+      vlan: "{{ vlan_id | default(1) }}"
+
+# Trunk Configuration - uplink to core switch
+trunk_interfaces:
+  - name: FastEthernet0/24
+    mode: trunk
+    trunk:
+      allowed_vlans: "1,10,20,30,40,50,60,70,80,90,100"
+
+# Management and SNMP settings
+domain_name: "company.local"
+snmp_community: "public"
+snmp_contact: "admin@company.com"
+snmp_location: "Data Center"
+enable_password: "admin"
+management_gateway: "192.168.1.254"
+"""
+        
+        # Write switch variables file
+        vars_path = self.automated_path / "ansible" / "roles" / "switch-config" / "vars" / "main.yml"
+        with open(vars_path, 'w') as f:
+            f.write(switch_vars)
+            
+        print(f"Created switch configuration role")
+
+    def create_router_role(self):
+        """
+        Create comprehensive Ansible role for router configuration.
+        Includes tasks, templates, and variables for routing and interface configuration.
+        """
+        
+        # Router configuration tasks
+        router_tasks = """---
+# Router Configuration Tasks
+- name: Apply router base configuration
+  cisco.ios.ios_config:
+    src: router-base.j2
+  tags: [base_config]
+
+- name: Configure interfaces
+  cisco.ios.ios_l3_interfaces:
+    config: "{{ router_interfaces }}"
+    state: merged
+  tags: [interfaces]
+
+- name: Configure routing
+  cisco.ios.ios_static_routes:
+    config: "{{ static_routes }}"
+    state: merged
+  when: static_routes is defined
+  tags: [routing]
+
+- name: Save configuration
+  cisco.ios.ios_config:
+    save_when: always
+  tags: [save]
+"""
+        
+        # Write router tasks file
+        router_tasks_path = self.automated_path / "ansible" / "roles" / "router-config" / "tasks" / "main.yml"
+        with open(router_tasks_path, 'w') as f:
+            f.write(router_tasks)
+
+        # Jinja2 template for router base configuration
+        router_template = """!
+! Router Base Configuration Template
+! Generated by Ansible
+!
+hostname {{ inventory_hostname }}
+!
+! Enable IP routing and CEF for performance
+ip routing
+ip cef
+!
+! Management interface configuration
+interface FastEthernet0/0
+ ip address {{ ansible_host }} 255.255.255.0
+ no shutdown
+!
+! Default route configuration
+ip route 0.0.0.0 0.0.0.0 {{ default_gateway | default('192.168.1.254') }}
+!
+! Enable services
+service password-encryption
+ip domain-name {{ domain_name | default('company.local') }}
+!
+! Security configuration
+enable secret {{ enable_password | default('admin') }}
+username {{ ansible_user }} privilege 15 secret {{ ansible_password }}
+!
+! SSH Configuration for remote management
+crypto key generate rsa modulus 1024
+ip ssh version 2
+!
+! Remote access lines
+line vty 0 15
+ login local
+ transport input ssh
+!
+"""
+        
+        # Write router template file
+        router_template_path = self.automated_path / "ansible" / "roles" / "router-config" / "templates" / "router-base.j2"
+        with open(router_template_path, 'w') as f:
+            f.write(router_template)
+
+        # Variables file for router configuration
+        router_vars = """---
+# Router Configuration Variables
+
+# Interface Configuration for L3 interfaces
+router_interfaces:
+  - name: FastEthernet0/0
+    ipv4:
+      - address: "{{ ansible_host }}/24"
+
+  - name: FastEthernet0/1
+    ipv4:
+      - address: "{{ gateway_ip | default('192.168.1.1') }}/24"
+
+# Static Routes Configuration (if needed)
+static_routes:
+  - address_families:
+      - afi: ipv4
+        routes:
+          - dest: 0.0.0.0/0
+            next_hops:
+              - forward_router_address: "{{ default_gateway | default('192.168.1.254') }}"
+
+# Management settings
+domain_name: "company.local"
+enable_password: "admin"
+default_gateway: "192.168.1.254"
+"""
+        
+        # Write router variables file
+        router_vars_path = self.automated_path / "ansible" / "roles" / "router-config" / "vars" / "main.yml"
+        with open(router_vars_path, 'w') as f:
+            f.write(router_vars)
+            
+        print(f"Created router configuration role")
+
+    def create_pc_role(self):
+        """
+        Create comprehensive Ansible role for PC/server configuration.
+        Supports multiple Linux distributions and includes network configuration templates.
+        """
+        
+        # PC configuration tasks for different operating systems
+        pc_tasks = """---
+# PC Configuration Tasks
+- name: Configure network interface (Ubuntu/Debian)
+  template:
+    src: netplan-config.j2
+    dest: /etc/netplan/01-network-config.yaml
+    backup: yes
+  when: ansible_os_family == "Debian"
+  notify: apply netplan
+  tags: [network]
+
+- name: Configure network interface (CentOS/RHEL)
+  template:
+    src: ifcfg-interface.j2
+    dest: "/etc/sysconfig/network-scripts/ifcfg-{{ ansible_default_ipv4.interface }}"
+    backup: yes
+  when: ansible_os_family == "RedHat"
+  notify: restart network
+  tags: [network]
+
+- name: Configure DNS
+  template:
+    src: resolv.conf.j2
+    dest: /etc/resolv.conf
+    backup: yes
+  tags: [dns]
+
+- name: Install basic packages
+  package:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ basic_packages }}"
+  tags: [packages]
+"""
+        
+        # Write PC tasks file
+        pc_tasks_path = self.automated_path / "ansible" / "roles" / "pc-config" / "tasks" / "main.yml"
+        with open(pc_tasks_path, 'w') as f:
+            f.write(pc_tasks)
+
+        # Event handlers for network configuration changes
+        pc_handlers = """---
+# PC Configuration Handlers
+- name: apply netplan
+  command: netplan apply
+  listen: "apply netplan"
+
+- name: restart network
+  service:
+    name: network
+    state: restarted
+  listen: "restart network"
+"""
+        
+        # Create handlers directory and write handlers file
+        handlers_path = self.automated_path / "ansible" / "roles" / "pc-config" / "handlers" / "main.yml"
+        (self.automated_path / "ansible" / "roles" / "pc-config" / "handlers").mkdir(exist_ok=True)
+        with open(handlers_path, 'w') as f:
+            f.write(pc_handlers)
+
+        # Netplan configuration template for Ubuntu 18.04+
+        netplan_template = """network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    {{ ansible_default_ipv4.interface | default('eth0') }}:
+      addresses:
+        - {{ ansible_host }}/{{ network_prefix | default('24') }}
+      gateway4: {{ gateway }}
+      nameservers:
+        addresses:
+          - {{ dns_servers[0] | default('8.8.8.8') }}
+          - {{ dns_servers[1] | default('8.8.4.4') }}
+        search:
+          - {{ domain_name | default('company.local') }}
+"""
+        
+        # Write netplan template
+        netplan_path = self.automated_path / "ansible" / "roles" / "pc-config" / "templates" / "netplan-config.j2"
+        with open(netplan_path, 'w') as f:
+            f.write(netplan_template)
+
+        # Variables file for PC configuration with department-specific packages
+        pc_vars = """---
+# PC Configuration Variables
+
+# Network Configuration
+network_prefix: "24"
+dns_servers:
+  - "8.8.8.8"
+  - "8.8.4.4"
+domain_name: "company.local"
+
+# Basic packages installed on all systems
+basic_packages:
+  - curl
+  - wget
+  - net-tools
+  - openssh-server
+  - htop
+  - vim
+  - git
+
+# Department-specific package configurations
+department_configs:
+  development:
+    additional_packages:
+      - docker.io
+      - nodejs
+      - npm
+      - python3-pip
+  
+  it:
+    additional_packages:
+      - ansible
+      - terraform
+      - kubectl
+      
+  design:
+    additional_packages:
+      - gimp
+      - inkscape
+      - blender
+"""
+        
+        # Write PC variables file
+        pc_vars_path = self.automated_path / "ansible" / "roles" / "pc-config" / "vars" / "main.yml"
+        with open(pc_vars_path, 'w') as f:
+            f.write(pc_vars)
+            
+        print(f"Created PC configuration role")
+
+    def create_playbooks(self):
+        """
+        Create main orchestration playbooks for different deployment scenarios.
+        Includes site-wide deployment, network-only, and end-device-only playbooks.
+        """
+        
+        # Main site playbook for complete infrastructure deployment
+        site_playbook = """---
+# Main Site Playbook
+# This playbook configures the entire network infrastructure
+
+- name: Configure Core Infrastructure
+  hosts: core_infrastructure
+  gather_facts: no
+  roles:
+    - switch-config
+    - router-config
+  tags: [core]
+
+- name: Configure Department Switches
+  hosts: department_switches
+  gather_facts: no
+  roles:
+    - switch-config
+  tags: [switches]
+
+- name: Configure Workstations
+  hosts: workstations
+  gather_facts: yes
+  become: yes
+  roles:
+    - pc-config
+  tags: [workstations]
+
+- name: Configure Servers
+  hosts: servers
+  gather_facts: yes
+  become: yes
+  roles:
+    - pc-config
+  vars:
+    basic_packages:
+      - curl
+      - wget
+      - net-tools
+      - openssh-server
+      - htop
+      - vim
+      - git
+      - docker.io
+      - nginx
+  tags: [servers]
+"""
+        
+        # Write main site playbook
+        site_path = self.automated_path / "ansible" / "site.yml"
+        with open(site_path, 'w') as f:
+            f.write(site_playbook)
+
+        # Network devices only playbook for infrastructure configuration
+        network_playbook = """---
+# Network Devices Configuration Playbook
+# Configures switches and routers only
+
+- name: Configure All Network Devices
+  hosts: network_devices
+  gather_facts: no
+  connection: network_cli
+  vars:
+    ansible_network_os: ios
+    ansible_user: admin
+    ansible_password: admin
+    ansible_become: yes
+    ansible_become_method: enable
+
+  tasks:
+    - name: Gather device facts
+      cisco.ios.ios_facts:
+        gather_subset: all
+      tags: [facts]
+
+    - name: Configure VLANs on switches
+      cisco.ios.ios_vlans:
+        config:
+          - vlan_id: 10
+            name: "Development-Engineering"
+            state: active
+          - vlan_id: 20
+            name: "Guest-Network"
+            state: active
+          - vlan_id: 30
+            name: "IT-Network"
+            state: active
+          - vlan_id: 40
+            name: "Sales-Marketing"
+            state: active
+          - vlan_id: 50
+            name: "Admin-Department"
+            state: active
+          - vlan_id: 60
+            name: "Human-Resources"
+            state: active
+          - vlan_id: 70
+            name: "Accounts-Finance"
+            state: active
+          - vlan_id: 80
+            name: "Design-Department"
+            state: active
+          - vlan_id: 90
+            name: "Marketing-Department"
+            state: active
+          - vlan_id: 100
+            name: "Infrastructure-Security"
+            state: active
+        state: merged
+      when: device_type == "switch"
+      tags: [vlans]
+
+    - name: Configure access ports
+      cisco.ios.ios_l2_interfaces:
+        config:
+          - name: FastEthernet0/1
+            access:
+              vlan: "{{ vlan_id | default(1) }}"
+          - name: FastEthernet0/2
+            access:
+              vlan: "{{ vlan_id | default(1) }}"
+          - name: FastEthernet0/3
+            access:
+              vlan: "{{ vlan_id | default(1) }}"
+          - name: FastEthernet0/4
+            access:
+              vlan: "{{ vlan_id | default(1) }}"
+        state: merged
+      when: device_type == "switch" and vlan_id is defined
+      tags: [interfaces]
+
+    - name: Save configuration
+      cisco.ios.ios_config:
+        save_when: always
+      tags: [save]
+"""
+        
+        # Write network devices playbook
+        network_path = self.automated_path / "ansible" / "playbooks" / "network-devices.yml"
+        (self.automated_path / "ansible" / "playbooks").mkdir(exist_ok=True)
+        with open(network_path, 'w') as f:
+            f.write(network_playbook)
+
+        # PC configuration playbook for end devices
+        pc_playbook = """---
+# PC Configuration Playbook
+# Configures all workstations and servers
+
+- name: Configure All PCs and Servers
+  hosts: end_devices
+  gather_facts: yes
+  become: yes
+  
+  vars:
+    network_prefix: "{{ (network | ipaddr('prefix')) | default('24') }}"
+    
+  tasks:
+    - name: Update package cache (Debian/Ubuntu)
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+      tags: [packages]
+
+    - name: Install basic packages
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - wget
+        - net-tools
+        - openssh-server
+        - htop
+        - vim
+        - git
+      tags: [packages]
+
+    - name: Configure static IP (Ubuntu 18.04+)
+      template:
+        src: ../roles/pc-config/templates/netplan-config.j2
+        dest: /etc/netplan/01-network-config.yaml
+        backup: yes
+      when: 
+        - ansible_os_family == "Debian"
+        - ansible_distribution_major_version|int >= 18
+      notify: apply netplan
+      tags: [network]
+
+    - name: Configure DNS
+      lineinfile:
+        path: /etc/resolv.conf
+        line: "{{ item }}"
+        create: yes
+      loop:
+        - "nameserver 8.8.8.8"
+        - "nameserver 8.8.4.4"
+        - "search company.local"
+      tags: [dns]
+# Forks - number of parallel processes
+forks = 10
+
+  handlers:
+    - name: apply netplan
+      command: netplan apply
+"""
+        
+        pc_path = self.automated_path / "ansible" / "playbooks" / "configure-pcs.yml"
+        with open(pc_path, 'w') as f:
+            f.write(pc_playbook)
+            
+        print(f" Created main playbooks")
+# Poll interval for async tasks
+poll_interval = 15
+
+    def create_deployment_scripts(self):
+        """Create deployment automation scripts"""
+        
+        # Main deployment script
+        deploy_script = """#!/bin/bash
+# Network Deployment Automation Script
+# Deploys complete network configuration
+# Vault password file (if using ansible-vault)
+# vault_password_file = ~/.vault_pass
+
+set -e
+# Logging
+# log_path = ./ansible.log
+
+# Colors for output
+RED='\\033[0;31m'
+GREEN='\\033[0;32m'
+YELLOW='\\033[1;33m'
+BLUE='\\033[0;34m'
+NC='\\033[0m' # No Color
+# Color output
+nocolor = 0
+
+# Logging function
+log() {
+    echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1"
+}
+# Diff mode
+# always = no
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+[inventory]
+# Enable inventory plugins
+enable_plugins = host_list, script, auto, yaml, ini, toml
+
+warn() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+# Inventory cache
+# cache = yes
+# cache_plugin = jsonfile
+# cache_connection = /tmp/ansible_inventory_cache
+# cache_timeout = 3600
+
+info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+[privilege_escalation]
+# Privilege escalation settings
+become = False
+become_method = sudo
+become_user = root
+become_ask_pass = False
+
+# Check prerequisites
+check_prerequisites() {
+    log "Checking prerequisites..."
+    
+    # Check if Ansible is installed
+    if ! command -v ansible &> /dev/null; then
+        error "Ansible is not installed. Please install it first."
+        exit 1
+    fi
+    
+    # Check if required collections are installed
+    if ! ansible-galaxy collection list | grep -q cisco.ios; then
+        warn "Cisco IOS collection not found. Installing..."
+        ansible-galaxy collection install cisco.ios
+    fi
+    
+    log "Prerequisites check completed"
+}
+# For network devices using enable mode
+# become = True
+# become_method = enable
+# become_user = admin
+
+# Test connectivity
+test_connectivity() {
+    log "Testing connectivity to devices..."
+    
+    cd /path/to/automated/ansible
+    
+    # Test network devices
+    info "Testing network devices..."
+    ansible network_devices -i inventories/production/hosts.ini -m ping || {
+        warn "Some network devices are not reachable"
+    }
+    
+    # Test end devices
+    info "Testing end devices..."
+    ansible end_devices -i inventories/production/hosts.ini -m ping || {
+        warn "Some end devices are not reachable"
+    }
+    
+    log "Connectivity test completed"
+}
+[paramiko_connection]
+# Settings for paramiko SSH connection
+record_host_keys = False
+look_for_keys = True
+host_key_auto_add = True
+
+# Deploy network configuration
+deploy_network() {
+    log "Deploying network configuration..."
+    
+    cd /path/to/automated/ansible
+    
+    # Deploy network devices first
+    info "Configuring network infrastructure..."
+    ansible-playbook -i inventories/production/hosts.ini playbooks/network-devices.yml || {
+        error "Network device configuration failed"
+        exit 1
+    }
+    
+    # Deploy end devices
+    info "Configuring workstations and servers..."
+    ansible-playbook -i inventories/production/hosts.ini playbooks/configure-pcs.yml || {
+        warn "Some PC configurations failed"
+    }
+    
+    log "Network deployment completed"
+}
+[ssh_connection]
+# SSH connection optimization
+ssh_args = -C -o ControlMaster=auto -o ControlPersist=60s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no
+
+# Backup configurations
+backup_configs() {
+    log "Backing up device configurations..."
+    
+    cd /path/to/automated/ansible
+    
+    # Create backup directory
+    backup_dir="backups/$(date +%Y%m%d_%H%M%S)"
+    mkdir -p "$backup_dir"
+    
+    # Backup network device configs
+    ansible-playbook -i inventories/production/hosts.ini -e "backup_dir=$backup_dir" playbooks/backup-configs.yml
+    
+    log "Configurations backed up to $backup_dir"
+}
+# Enable pipelining for better performance
+pipelining = True
+
+# Main execution
+main() {
+    log "Starting network deployment automation..."
+    
+    case "${1:-deploy}" in
+        "check")
+            check_prerequisites
+            test_connectivity
+            ;;
+        "deploy")
+            check_prerequisites
+            test_connectivity
+            deploy_network
+            ;;
+        "backup")
+            backup_configs
+            ;;
+        "full")
+            check_prerequisites
+            backup_configs
+            test_connectivity
+            deploy_network
+            ;;
+        *)
+            echo "Usage: $0 {check|deploy|backup|full}"
+            echo "  check  - Check prerequisites and connectivity"
+            echo "  deploy - Deploy network configuration"
+            echo "  backup - Backup current configurations"
+            echo "  full   - Full deployment with backup"
+            exit 1
+            ;;
+    esac
+    
+    log "Network deployment automation completed"
+}
+# Control path for SSH multiplexing
+control_path = /tmp/ansible-ssh-%%h-%%p-%%r
+
+main "$@"

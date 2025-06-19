@@ -1,0 +1,5 @@
+department_name: Infrastructure & Security
+gateway: 192.168.0.1
+subnet: 192.168.0.0/23
+vlan_id: 100
+vlan_name: Infrastructure-and-Security

@@ -1,0 +1,5 @@
+department_name: Development/Engineering
+gateway: 192.168.10.1
+subnet: 192.168.10.0/28
+vlan_id: 10
+vlan_name: Development-Engineering

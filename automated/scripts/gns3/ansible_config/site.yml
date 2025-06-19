@@ -1,0 +1,17 @@
+---
+# Main Site Deployment Playbook
+- name: Configure Network Infrastructure
+  hosts: network_devices
+  gather_facts: no
+  roles:
+    - switch-config
+    - router-config
+  tags: [network]
+
+- name: Configure End Devices
+  hosts: end_devices
+  gather_facts: yes
+  become: yes
+  roles:
+    - pc-config
+  tags: [endpoints]
