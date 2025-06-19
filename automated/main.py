@@ -25,7 +25,7 @@ import logging
 
 # Import custom modules for network automation functionality
 sys.path.append(str(Path(__file__).parent))
-from scripts.gns3.fixed_generator import NetworkAutomationGenerator
+from scripts.gns3.generator import NetworkAutomationGenerator
 from scripts.gns3.verify_existing_project import EnhancedGNS3Builder
 from scripts.gns3.diagnostic import GNS3NetworkManager
 
