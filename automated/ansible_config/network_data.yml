@@ -1,6 +1,5 @@
 ---
 # Network configuration data - all manual configuration here!
-# Fixed relationships and removed duplicates
 departments:
 - name: Development/Engineering
   vlan: 10
@@ -9,9 +8,12 @@ departments:
   devices:
   # Main department switch
   - type: switch
-    name: SW-10-DEV
-    ip: 192.168.10.2
+    name: SW-10-A
+    ip: 192.168.10.250  # Management IP
   # Department PCs
+  - type: pc
+    name: PC-1-10
+    ip: 192.168.10.2
   - type: pc
     name: PC-2-10
     ip: 192.168.10.3
@@ -24,17 +26,14 @@ departments:
   - type: pc
     name: PC-5-10
     ip: 192.168.10.6
-  - type: pc
-    name: PC-6-10
-    ip: 192.168.10.7
   # Department router
   - type: router
     name: R-10-A
     ip: 192.168.10.1
-  # Server switch for department
-  - type: switch
+  # Server for department
+  - type: server
     name: Server-1-10
-    ip: 192.168.10.8
+    ip: 192.168.10.7
 
 - name: Guest Network
   vlan: 20
@@ -43,36 +42,42 @@ departments:
   devices:
   # Main department switch
   - type: switch
-    name: SW-20-GUEST
-    ip: 192.168.20.2
-  # Guest PCs
+    name: SW-20-D
+    ip: 192.168.20.250  # Management IP
+  # Guest Laptop
   - type: pc
-    name: PC-2-20
+    name: LP-1-20
+    ip: 192.168.20.2
+  - type: pc
+    name: LP-2-20
     ip: 192.168.20.3
   - type: pc
-    name: PC-3-20
+    name: LP-3-20
     ip: 192.168.20.4
   - type: pc
-    name: PC-4-20
+    name: LP-4-20
     ip: 192.168.20.5
   - type: pc
-    name: PC-5-20
+    name: LP-5-20
     ip: 192.168.20.6
   # Department router
   - type: router
     name: R-20-D
     ip: 192.168.20.1
 
-- name: IT Network
+- name: IT
   vlan: 30
   subnet: 192.168.30.0/28
   gateway: 192.168.30.1
   devices:
   # Main department switch
   - type: switch
-    name: SW-30-IT
-    ip: 192.168.30.2
+    name: SW-30-B
+    ip: 192.168.30.250  # Management IP
   # IT Department PCs 
+  - type: pc
+    name: PC-1-30
+    ip: 192.168.30.2
   - type: pc
     name: PC-2-30
     ip: 192.168.30.3
@@ -92,8 +97,8 @@ departments:
   - type: router
     name: R-30-B
     ip: 192.168.30.1
-  # Server switch for IT department
-  - type: switch
+  # Server  for IT department
+  - type: server
     name: Server-1-30
     ip: 192.168.30.8
 
@@ -104,9 +109,12 @@ departments:
   devices:
   # Main department switch
   - type: switch
-    name: SW-40-SALES
-    ip: 192.168.40.2
+    name: SW-40-C
+    ip: 192.168.40.250  # Management IP
   # Sales PCs
+  - type: pc
+    name: PC-1-40
+    ip: 192.168.40.2
   - type: pc
     name: PC-2-40
     ip: 192.168.40.3
@@ -114,7 +122,7 @@ departments:
     name: PC-3-40
     ip: 192.168.40.4
   # Department printer
-  - type: pc
+  - type: printer
     name: printer-1-40
     ip: 192.168.40.5
   # Department router
@@ -129,9 +137,12 @@ departments:
   devices:
   # Main department switch
   - type: switch
-    name: SW-50-ADMIN
-    ip: 192.168.50.2
+    name: SW-50-H
+    ip: 192.168.50.250  # Management IP
   # Admin PCs
+  - type: pc
+    name: PC-1-50
+    ip: 192.168.50.2
   - type: pc
     name: PC-2-50
     ip: 192.168.50.3
@@ -147,14 +158,17 @@ departments:
   devices:
   # Main department switch
   - type: switch
-    name: SW-60-HR
-    ip: 192.168.60.2
+    name: SW-60-E
+    ip: 192.168.60.250  # Management IP
   # HR PCs
+  - type: pc
+    name: PC-1-60
+    ip: 192.168.60.2
   - type: pc
     name: PC-2-60
     ip: 192.168.60.3
   # Department printer
-  - type: pc
+  - type: printer
     name: printer-1-60
     ip: 192.168.60.4
   # Department router
@@ -169,14 +183,17 @@ departments:
   devices:
   # Main department switch
   - type: switch
-    name: SW-70-FINANCE
-    ip: 192.168.70.2
+    name: SW-70-E
+    ip: 192.168.70.250  # Management IP
   # Finance PCs
+  - type: pc
+    name: PC-1-70
+    ip: 192.168.70.2
   - type: pc
     name: PC-2-70
     ip: 192.168.70.3
   # Department server
-  - type: pc
+  - type: server
     name: server-1-70
     ip: 192.168.70.4
   # Department router
@@ -191,9 +208,12 @@ departments:
   devices:
   # Main department switch
   - type: switch
-    name: SW-80-DESIGN
-    ip: 192.168.80.2
+    name: SW-80-J
+    ip: 192.168.80.250  # Management IP
   # Design PCs
+  - type: pc
+    name: PC-1-80
+    ip: 192.168.80.2
   - type: pc
     name: PC-2-80
     ip: 192.168.80.3
@@ -209,9 +229,12 @@ departments:
   devices:
   # Main department switch
   - type: switch
-    name: SW-90-MARKETING
-    ip: 192.168.90.2
+    name: SW-90-I
+    ip: 192.168.90.250  # Management IP
   # Marketing PCs
+  - type: pc
+    name: PC-1-90
+    ip: 192.168.90.2
   - type: pc
     name: PC-2-90
     ip: 192.168.90.3
@@ -227,9 +250,12 @@ departments:
   devices:
   # Main department switch
   - type: switch
-    name: SW-100-INFRA
-    ip: 192.168.0.8
+    name: SW-100-G
+    ip: 192.168.0.250  # Management IP
   # Infrastructure PCs
+  - type: pc
+    name: PC-1-100
+    ip: 192.168.0.8
   - type: pc
     name: PC-2-100
     ip: 192.168.0.9
@@ -242,23 +268,23 @@ departments:
   - type: router
     name: R-100-G
     ip: 192.168.0.1
-  # Server switches for infrastructure
-  - type: switch
+  # Server  for infrastructure
+  - type: server
     name: Server-1-100
     ip: 192.168.0.2
-  - type: switch
+  - type: server
     name: Server-2-100
     ip: 192.168.0.3
-  - type: switch
+  - type: server
     name: Server-3-100
     ip: 192.168.0.4
-  - type: switch
+  - type: server
     name: Server-4-100
     ip: 192.168.0.5
-  - type: switch
+  - type: server
     name: Server-5-100
     ip: 192.168.0.6
-  - type: switch
+  - type: server
     name: Server-6-100
     ip: 192.168.0.7
 
@@ -266,5 +292,5 @@ departments:
 core_infrastructure:
   - type: switch
     name: CoreSwitch
-    ip: 192.168.1.2
+    ip: 192.168.1.1
     description: "Main core switch connecting all department routers"
