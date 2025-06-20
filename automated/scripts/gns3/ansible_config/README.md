@@ -146,7 +146,7 @@ ansible-playbook -i inventories/hosts.yml site.yml
 ## Files Generated
 
 - `ansible.cfg` - Ansible configuration
-- `inventories/hosts.yml` - Device inventory with exact IP addresses
+- `inventories/hosts.yml` - Device inventory with exact IP addresses (FIXED FORMAT)
 - `playbooks/` - Deployment playbooks
 - `roles/` - Configuration roles (no template files)
 - `group_vars/` - Group variables
@@ -164,3 +164,23 @@ All IP addresses are taken directly from network_data.yml:
 - Ansible 2.9+
 - cisco.ios collection
 - Network devices accessible via SSH/Telnet
+
+## FIXED: Inventory Format
+
+This generator now creates proper dictionary format for children entries:
+```yaml
+network_devices:
+  children:
+    switches: {}      # Dictionary format (CORRECT)
+    routers: {}
+    core_infrastructure: {}
+```
+
+Instead of the problematic list format:
+```yaml
+network_devices:
+  children:           # This was causing errors
+  - switches          # List format (WRONG)
+  - routers
+  - core_infrastructure
+```
