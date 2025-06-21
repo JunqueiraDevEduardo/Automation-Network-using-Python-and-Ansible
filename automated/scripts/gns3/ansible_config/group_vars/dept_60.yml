@@ -1,5 +1,0 @@
-department_name: Human Resource Management
-gateway: 192.168.60.1
-subnet: 192.168.60.0/29
-vlan_id: 60
-vlan_name: Human-Resource-Management

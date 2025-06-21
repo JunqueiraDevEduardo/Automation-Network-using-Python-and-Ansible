@@ -1,5 +1,0 @@
-department_name: Marketing
-gateway: 192.168.90.1
-subnet: 192.168.90.0/29
-vlan_id: 90
-vlan_name: Marketing

@@ -1,9 +1,0 @@
----
-# PC Configuration Handlers
-- name: apply netplan
-  command: netplan apply
-
-- name: restart network
-  service:
-    name: network
-    state: restarted
