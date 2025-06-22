@@ -25,7 +25,7 @@ import logging
 
 # Import custom modules for network automation functionality
 sys.path.append(str(Path(__file__).parent))
-from scripts.gns3.generator import NetworkAutomationGenerator
+from automated.scripts.gns3.generatorv1 import NetworkAutomationGenerator
 from scripts.gns3.verify_existing_project import EnhancedGNS3Builder
 from scripts.gns3.diagnostic import GNS3NetworkManager
 
@@ -173,10 +173,14 @@ class NetworkAutomationController:
         print("-" * 40)
         
         try:
+            
             # Use NetworkAutomationGenerator to create all Ansible configurations
             generator = NetworkAutomationGenerator(str(self.config_path))
-            generator.save_all_files()  # Generate inventory, playbooks, and roles
-            
+            generator.create_directory_structure() 
+            generator.create_gns3_nodes()
+            generator.create_gns3_links()
+             
+
             print("Ansible configuration generated successfully")
             
         except Exception as e:

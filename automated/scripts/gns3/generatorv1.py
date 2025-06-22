@@ -1,100 +1,182 @@
-#!/usr/bin/env python3
-"""
-Network Automation Generator - CORRECTED VERSION
+""""
+Project 2 Eduardo Junqueira IPVC-ESTG ERSC
+Network Automation Generator
 Reads network_data.yml and generates complete Ansible automation structure
 Creates proper inventory, playbooks, roles, and configuration files
-FIXED: Ensures all YAML children entries use dictionary format, not list format
 """
 
-import yaml
-import json
-import os
+import yaml #Most Important for Ansible
+import os #FILE OPERATIONS check if network_data.yml exists
 from pathlib import Path #Ansible file organization
-from typing import Dict, List, Any
-import time  # For timestamp generation
 
 class NetworkAutomationGenerator:
-    """
+  """
     Main generator class that converts network_data.yml into complete Ansible automation
     Creates proper directory structure, inventory, playbooks, and configuration files
     All templates embedded in code - no external template files needed
-    FIXED: All children entries use correct dictionary format for Ansible compatibility
+  """
+  def __init__(self, network_data_file: str = "network_data.yml"):
+    """
+    Initialize GNS3 Network Manager for automated network deployment.
+    Sets up configuration paths, device mappings, and GNS3 API v3 connection parameters.
     """
     
-    def __init__(self, network_data_file: str = "/network_data.yml"):
-        """
-        Initialize generator with network data file path
-        Sets up base paths and loads network configuration
-        """
-        self.network_data_file = network_data_file
-        self.output_dir = "automated/scripts/gns3/"
-        self.network_data = None
-        self.departments = []
-        self.core_infrastructure = []
-        
-        # Device type mappings for Ansible inventory organization
-        self.device_type_mapping = {
-            'switch': 'switches',
-            'router': 'routers', 
-            'pc': 'pcs',
-            'server': 'servers',
-            'printer': 'printers'
+      # File and directory configuration
+    self.network_data_file = network_data_file
+    self.output_dir = "scripts"  # Fixed: was "/scripts" (absolute path)
+    
+    # Data containers - populated when loading YAML configuration
+    self.network_data = None
+    self.departments = []
+    self.core_infrastructure = []
+    
+    # Ansible inventory grouping - maps device types to Ansible groups
+    self.device_type_mapping = {
+        'switch': 'switches',
+        'router': 'routers',
+        'pc': 'pcs',
+        'lp': 'pcs',        # Laptops grouped with PCs
+        'server': 'servers',
+        'printer': 'printers'
+    }
+    
+    # GNS3 hardware templates - defines which GNS3 node type for each device
+    self.gns3_hardware_mapping = {
+        'switch': {
+            'template_name': 'Cisco IOSv Switch',
+            'node_type': 'dynamips',
+            'properties': {
+                'platform': 'c3745',
+                'ram': 256,
+                'nvram': 256
+            }
+        },
+        'router': {
+            'template_name': 'Cisco IOSv Router',
+            'node_type': 'dynamips',
+            'properties': {
+                'platform': 'c7200',
+                'ram': 512,
+                'nvram': 256
+            }
+        },
+        'pc': {
+            'template_name': 'VPCS',
+            'node_type': 'vpcs',
+            'properties': {}
+        },
+        'lp': {  # Laptops (Guest Network)
+            'template_name': 'VPCS',
+            'node_type': 'vpcs',
+            'properties': {}
+        },
+        'server': {
+            'template_name': 'Ubuntu Server',
+            'node_type': 'docker',
+            'properties': {
+                'image': 'ubuntu:20.04',
+                'ram': 1024
+            }
+        },
+        'printer': {
+            'template_name': 'VPCS',
+            'node_type': 'vpcs',
+            'properties': {}
         }
-        
-    def load_network_data(self):
-        """
-        Load network configuration from YAML file
-        Handles file reading and error management
-        """
-        try:
-            if os.path.exists(self.network_data_file):
-                with open(self.network_data_file, 'r') as f:
-                    self.network_data = yaml.safe_load(f)
-                print(f"Loaded network data from {self.network_data_file}")
-            else:
-                print(f"Error: Network data file {self.network_data_file} not found")
-                return False
-                
-            # Extract departments and core infrastructure
-            self.departments = self.network_data.get('departments', [])
-            self.core_infrastructure = self.network_data.get('core_infrastructure', [])
-            
-            print(f"Found {len(self.departments)} departments")
-            print(f"Found {len(self.core_infrastructure)} core infrastructure devices")
-            return True
-            
-        except yaml.YAMLError as e:
-            print(f"Error parsing YAML: {e}")
-            return False
-        except Exception as e:
-            print(f"Error loading network data: {e}")
-            return False
+    }
     
-def create_directory_structure(self):
+    # GNS3 API v3 connection settings
+    self.gns3_server_url = "http://127.0.0.1:3080"
+    self.gns3_project_id = None
+    self.gns3_username = "admin"  # Added: missing authentication
+    self.gns3_password = "admin"  # Added: missing authentication
+    
+    # Workflow management - track automation progress
+    self.gns3_manager = None      # GNS3NetworkManager instance
+    self.created_nodes = {}       # Track created nodes for linking
+    self.created_links = []       # Track network connections
+    
+    # Department and device organization for Ansible
+    self.department_groups = {}   # Group devices by department
+    self.device_type_groups = {   # Group devices by type
+        'switches': [],
+        'routers': [],
+        'pcs': [],
+        'servers': [],
+        'printers': []
+    }
+  def load_network_data(self):
     """
-    Create simplified Ansible directory structure
-    Creates only essential folders for basic automation
+    Load network configuration from YAML file.
+    Extracts departments and core infrastructure for network automation.
+    Returns: bool - True if successful, False if failed
     """
-    directories = [
-        self.output_dir,                           # Main output directory
-        f"{self.output_dir}/inventories",          # For inventory files
-        f"{self.output_dir}/playbooks",            # For playbook files
-        f"{self.output_dir}/group_vars",           # For group variables
-        f"{self.output_dir}/roles/network-config/tasks",  # Single role for all network tasks
-        f"{self.output_dir}/roles/network-config/vars"    # Single role variables
-    ]
-    
-    for directory in directories:
-        Path(directory).mkdir(parents=True, exist_ok=True)
+    try:
+        # Check if configuration file exists
+        if not os.path.exists(self.network_data_file):
+            print(f"Error: Network data file {self.network_data_file} not found")
+            return False
         
-    print(f"Created simplified directory structure in {self.output_dir}")
+        # Load and parse YAML file
+        with open(self.network_data_file, 'r') as f:
+            self.network_data = yaml.safe_load(f)
+        
+        # Validate loaded data structure
+        if not isinstance(self.network_data, dict):
+            print("Error: Invalid YAML structure - expected dictionary")
+            return False
+        
+        # Extract network components
+        self.departments = self.network_data.get('departments', [])
+        self.core_infrastructure = self.network_data.get('core_infrastructure', [])
+        
+        # Validate extracted data
+        if not self.departments:
+            print("Warning: No departments found in configuration")
+        
+        print(f"Loaded: {len(self.departments)} departments, {len(self.core_infrastructure)} core devices")
+        return True
+        
+    except yaml.YAMLError as e:
+        print(f"YAML parsing error: {e}")
+        return False
+    except Exception as e:
+        print(f"File loading error: {e}")
+        return False
+  def create_directory_structure(self):
+    """
+    Create folders for network automation files.
+    Makes directories needed to organize Ansible configuration for 10-department network.
+    """
     
-def generate_ansible_cfg(self):
-        """
-        Generate main ansible.cfg configuration file
-        Sets up Ansible behavior and connection parameters
-        """
-        config_content = """[defaults]
+    # Main folder - holds all automation files
+    Path(self.output_dir).mkdir(exist_ok=True)
+    
+    # Inventories folder - device lists with IPs (192.168.10.x, 192.168.100.x, etc.)
+    Path(self.output_dir + "/inventories").mkdir(exist_ok=True)
+    
+    # Playbooks folder - automation scripts for VLAN 10-100 configuration
+    Path(self.output_dir + "/playbooks").mkdir(exist_ok=True)
+    
+    # Group departments folder - department settings (Development, IT, Sales, etc.)
+    Path(self.output_dir + "/group_department").mkdir(exist_ok=True)
+    
+    # Tasks folder - Cisco commands for switch and router configuration
+    Path(self.output_dir + "/roles/network-config/hardware").mkdir(parents=True, exist_ok=True)
+    
+    # Role department folder - VLAN numbers and IP address ranges
+    Path(self.output_dir + "/roles/network-config/department_conf").mkdir(exist_ok=True)
+    
+    print(f"Created network automation folders in {self.output_dir}")
+  def generate_ansible_cfg(self):
+    """
+    Generate ansible.cfg file with network device settings.
+    Configures Ansible for Cisco switches, routers, and end devices.
+    """
+    
+    # Ansible configuration content - optimized for network automation
+    config_content = """[defaults]
+# Basic Ansible settings for network automation
 inventory = inventories/hosts.yml
 remote_user = admin
 host_key_checking = False
@@ -105,29 +187,33 @@ stdout_callback = yaml
 forks = 10
 
 [persistent_connection]
+# Network device connection timeouts
 connect_timeout = 30
 command_timeout = 30
 
 [ssh_connection]
+# SSH optimization for network devices - prevents connection issues
 ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
 pipelining = True
 
 [privilege_escalation]
+# Enable mode 
 become = True
 become_method = enable
 become_user = admin
 become_ask_pass = False
 """
-        
-        with open(f"{self.output_dir}/ansible.cfg", 'w') as f:
-            f.write(config_content)
-        print("Generated ansible.cfg")
-
-def generate_inventory(self):
+    
+    # Write configuration file to output directory
+    with open(f"{self.output_dir}/ansible.cfg", 'w') as f:
+        f.write(config_content)
+    
+    print("Generated ansible.cfg for network device automation")
+  def generate_inventory(self):
     """
-    Generate Ansible inventory from network_data.yml
-    Uses only real values from network configuration
-    Creates simple, clean inventory structure
+      Generate Ansible inventory from network_data.yml
+      Uses only real values from network configuration
+      Creates simple, clean inventory structure
     """
     # Initialize basic inventory structure with device type groups
     inventory = {
@@ -154,7 +240,7 @@ def generate_inventory(self):
         # Add to core_infrastructure group
         inventory['all']['children']['core_infrastructure']['hosts'][device_name] = device_info
     
-    # Process each department using only real values
+    # Process each department using only real values (Development, IT, Sales, etc.)
     for dept in self.departments:
         # Extract department information - no defaults, must exist
         dept_name = dept['name']        # Real department name
@@ -175,7 +261,7 @@ def generate_inventory(self):
             }
         }
         
-        # Process each device in the department
+        # Process each device in the department (PC-10-A, etc.)
         for device in devices:
             device_name = device['name']        # Real device name
             device_type = device['type']        # Real device type
@@ -202,6 +288,7 @@ def generate_inventory(self):
                     'ansible_become': 'yes',
                     'ansible_become_method': 'enable'
                 })
+                # End devices (PCs, servers, printers) use SSH
             elif device_type in ['pc', 'server', 'printer']:
                 # End devices use SSH connection
                 device_info.update({
@@ -230,8 +317,14 @@ def generate_inventory(self):
     
     print(f"Generated inventory file: {self.output_dir}/inventories/hosts.yml")
     print(f"Total devices processed: {sum(len(group['hosts']) for group in inventory['all']['children'].values())}")
-
-def generate_group_vars(self):
+    # Write inventory file
+    with open(f"{self.output_dir}/inventories/hosts.yml", 'w') as f:
+        yaml.dump(inventory, f, default_flow_style=False, indent=2, sort_keys=False)
+    
+    # Count total devices for confirmation
+    total_devices = sum(len(group['hosts']) for group in inventory['all']['children'].values())
+    print(f"Generated inventory: {total_devices} devices in {self.output_dir}/inventories/hosts.yml")
+  def generate_group_department(self):
     """
     Generate group variables for device types and departments
     Uses only real values from network_data.yml
@@ -345,7 +438,7 @@ def generate_group_vars(self):
     
     print("Generated group variables for all device types and departments")
     print(f"Created {len(self.departments) + 6} group variable files")
-def generate_network_role(self):
+  def generate_network_role(self):
     """
     Generate complete network configuration role for switches and routers
     Uses simplified single-role structure with real values only
@@ -500,7 +593,7 @@ def generate_network_role(self):
     print("Generated complete network configuration role for switches and routers")
     print(f"Created VLAN configurations for {len(self.departments)} departments")
     print("Note: PCs, servers, and printers use different configuration methods (SSH)")
-def generate_end_devices_role(self):
+  def generate_end_devices_role(self):
     """
     Generate end devices configuration role for PCs, servers, and printers
     Uses simplified directory structure with real values
@@ -725,225 +818,7 @@ def generate_end_devices_role(self):
     print("  - Printers: Network configuration + CUPS printing service")
     print("Added end device tasks to unified network-config role")
     print(f"Configured {len(end_devices_vars['basic_packages'])} basic packages and {len(end_devices_vars['server_packages'])} server packages")
-def generate_playbooks(self):
-    """
-    Generate main playbooks for network deployment
-    Creates simplified playbooks that use the unified network-config role
-    Generates site-wide deployment and device-specific playbooks
-    """
-    
-    # MAIN SITE DEPLOYMENT PLAYBOOK
-    # This is the master playbook that configures the entire network
-    # It handles both network infrastructure and end devices
-    site_playbook = """---
-# Main Site Deployment Playbook
-# This playbook configures the complete network infrastructure
-# Run this to deploy the entire network from scratch
-
-# CONFIGURE NETWORK INFRASTRUCTURE (Switches and Routers)
-# Uses network_cli connection for Cisco devices
-- name: Configure Network Infrastructure Devices
-  hosts: switches:routers:core_infrastructure  # All network hardware
-  gather_facts: no                            # Skip fact gathering for network devices
-  connection: network_cli                     # Use network CLI connection
-  vars:
-    ansible_network_os: ios                   # Cisco IOS operating system
-  roles:
-    - network-config                          # Unified role for all network config
-  tags: [network, infrastructure]
-
-# CONFIGURE END DEVICES (PCs, Servers, Printers)
-# Uses SSH connection for Linux/Unix systems
-- name: Configure End Devices
-  hosts: pcs:servers:printers                 # All end user devices
-  gather_facts: yes                          # Gather facts for end devices
-  become: yes                                # Use sudo for privilege escalation
-  connection: ssh                            # Use SSH connection
-  vars:
-    ansible_user: admin                      # SSH username
-  roles:
-    - network-config                         # Same role, different tasks
-  tags: [endpoints, end_devices]
-"""
-    
-    # Write the main site playbook
-    with open(f"{self.output_dir}/site.yml", 'w') as f:
-        f.write(site_playbook)
-    
-    # NETWORK DEVICES ONLY PLAYBOOK
-    # This playbook configures only switches and routers
-    # Useful for network-only updates without touching end devices
-    network_playbook = """---
-# Network Devices Only Configuration Playbook
-# Configures switches, routers, and core infrastructure
-# Does NOT configure PCs, servers, or printers
-
-- name: Configure Network Infrastructure Only
-  hosts: switches:routers:core_infrastructure  # Only network devices
-  gather_facts: no                            # Skip fact gathering
-  connection: network_cli                     # Network CLI connection
-  vars:
-    ansible_network_os: ios                   # Cisco IOS
-    ansible_user: admin                       # Device username
-    ansible_password: admin                   # Device password
-  
-  tasks:
-    # CONFIGURE VLANs ON SWITCHES USING REAL DEPARTMENT DATA
-    - name: Configure department VLANs on switches
-      cisco.ios.ios_vlans:
-        config:"""
-    
-    # Add real VLAN configurations from departments (no defaults)
-    for dept in self.departments:
-        vlan_id = dept['vlan']      # Real VLAN ID - no default
-        dept_name = dept['name']    # Real department name - no default
-        # Clean department name for Cisco VLAN naming requirements
-        clean_name = dept_name.replace('/', '-').replace(' ', '-').replace('&', 'and')
-        network_playbook += f"""
-          - vlan_id: {vlan_id}
-            name: "{clean_name}"
-            state: active"""
-    
-    # Continue with network playbook tasks
-    network_playbook += """
-        state: merged                         # Merge with existing config
-      when: device_type == "switch"          # Only run on switches
-      tags: [vlans, switches]
-
-    # CONFIGURE SWITCH MANAGEMENT INTERFACES
-    - name: Configure switch management interface
-      cisco.ios.ios_config:
-        lines:
-          - "ip address {{ ansible_host }} {{ subnet | ipaddr('netmask') }}"
-          - "no shutdown"
-          - "description Management Interface"
-        parents: interface vlan1              # Management VLAN interface
-      when: device_type == "switch"          # Only run on switches
-      tags: [mgmt_interface, switches]
-
-    # CONFIGURE ROUTER INTERFACES  
-    - name: Configure router department interface
-      cisco.ios.ios_config:
-        lines:
-          - "ip address {{ ansible_host }} {{ subnet | ipaddr('netmask') }}"
-          - "no shutdown"
-          - "description {{ department }} Department Gateway"
-        parents: interface GigabitEthernet0/0  # Main LAN interface
-      when: device_type == "router"          # Only run on routers
-      tags: [router_interface, routers]
-
-    # SAVE CONFIGURATION ON ALL NETWORK DEVICES
-    - name: Save running configuration
-      cisco.ios.ios_config:
-        save_when: always                    # Always save changes
-      when: device_type in ["switch", "router"]
-      tags: [save, network_devices]
-"""
-    
-    # Write the network-only playbook
-    with open(f"{self.output_dir}/playbooks/deploy_network.yml", 'w') as f:
-        f.write(network_playbook)
-    
-    # VLAN CONFIGURATION ONLY PLAYBOOK
-    # This playbook only configures VLANs on switches
-    # Useful for adding new VLANs without full device reconfiguration
-    vlan_playbook = """---
-# VLAN Configuration Only Playbook
-# Configures department VLANs on switches only
-# Does NOT configure interfaces or other settings
-
-- name: Configure VLANs on Switches Only
-  hosts: switches                            # Only switch devices
-  gather_facts: no                          # Skip fact gathering
-  connection: network_cli                   # Network CLI connection
-  vars:
-    ansible_network_os: ios                 # Cisco IOS
-    ansible_user: admin                     # Switch username
-    ansible_password: admin                 # Switch password
-  
-  tasks:
-    # CONFIGURE ALL DEPARTMENT VLANs USING REAL DATA
-    - name: Configure department VLANs with real IDs and names
-      cisco.ios.ios_vlans:
-        config:"""
-    
-    # Add real VLAN configurations (no defaults)
-    for dept in self.departments:
-        vlan_id = dept['vlan']      # Real VLAN ID from network_data.yml
-        dept_name = dept['name']    # Real department name
-        # Clean name for Cisco compatibility
-        clean_name = dept_name.replace('/', '-').replace(' ', '-').replace('&', 'and')
-        vlan_playbook += f"""
-          - vlan_id: {vlan_id}                # Real VLAN ID: {vlan_id}
-            name: "{clean_name}"              # Clean name: {clean_name}
-            state: active                     # VLAN is active"""
-    
-    # Complete VLAN playbook
-    vlan_playbook += """
-        state: merged                         # Merge with existing VLANs
-      tags: [vlans]
-
-    # SAVE VLAN CONFIGURATION
-    - name: Save VLAN configuration to startup-config
-      cisco.ios.ios_config:
-        save_when: always                    # Always save changes
-      tags: [save]
-"""
-    
-    # Write the VLAN-only playbook
-    with open(f"{self.output_dir}/playbooks/configure_vlans.yml", 'w') as f:
-        f.write(vlan_playbook)
-    
-    # END DEVICES ONLY PLAYBOOK
-    # This playbook configures only PCs, servers, and printers
-    # Useful for end device updates without touching network infrastructure
-    end_devices_playbook = """---
-# End Devices Only Configuration Playbook
-# Configures PCs, servers, and printers only
-# Does NOT configure switches or routers
-
-- name: Configure End Devices Only
-  hosts: pcs:servers:printers                # Only end devices
-  gather_facts: yes                          # Need facts for end devices
-  become: yes                                # Use sudo privileges
-  connection: ssh                            # SSH connection
-  vars:
-    ansible_user: admin                      # SSH username
-  
-  tasks:
-    # INCLUDE END DEVICE TASKS FROM ROLE
-    - name: Include end device configuration tasks
-      include_tasks: "{{ role_path }}/tasks/end_devices.yml"
-      tags: [end_devices, configuration]
-
-    # INSTALL BASIC PACKAGES ON PCs AND SERVERS
-    - name: Install basic packages
-      package:
-        name: "{{ basic_packages }}"
-        state: present
-      when: device_type in ["pc", "server"]
-      tags: [packages]
-
-    # CONFIGURE HOSTNAME FOR ALL END DEVICES
-    - name: Set hostname
-      hostname:
-        name: "{{ inventory_hostname }}"
-      tags: [hostname]
-"""
-    
-    # Write the end devices playbook
-    with open(f"{self.output_dir}/playbooks/configure_end_devices.yml", 'w') as f:
-        f.write(end_devices_playbook)
-    
-    # Print summary of generated playbooks
-    print("Generated playbooks with real VLAN configurations and comprehensive comments")
-    print("Created playbooks:")
-    print("  - site.yml: Complete network deployment")
-    print("  - deploy_network.yml: Network devices only") 
-    print("  - configure_vlans.yml: VLAN configuration only")
-    print("  - configure_end_devices.yml: End devices only")
-    print(f"Configured VLANs for {len(self.departments)} departments using real data")
-def generate_playbooks(self):
+  def generate_playbooks(self):
     """
     Generate main playbooks for network deployment
     Creates simplified playbooks that use the unified network-config role
@@ -1194,7 +1069,7 @@ def generate_playbooks(self):
     print("  4. configure_end_devices.yml - End devices only (PCs/servers/printers)")
     print(f"Configured {len(self.departments)} department VLANs using real data from network_data.yml")
     print("All playbooks use simplified network-config role structure")
-def generate_network_documentation(self):
+  def generate_network_documentation(self):
     """
     Generate comprehensive network documentation using real values only
     Creates README and topology reference files for university project presentation
@@ -1302,7 +1177,7 @@ Deploy the entire network infrastructure and all end devices:
 ```bash
 ansible-playbook site.yml
 """
-def run_generation(self):
+  def run_generation(self):
     """
     Main execution method that orchestrates the complete network automation generation process
     Loads network data, creates directory structure, and generates all Ansible configuration files
@@ -1368,7 +1243,7 @@ def run_generation(self):
         print("  - All IP addresses taken directly from network configuration")
         
         # Generate group variables for device types
-        self.generate_group_vars()
+        self.generate_group_department()
         print("Generated group variables for all device types")
         print("  - Created variables for switches, routers, pcs, servers, printers")
         
@@ -1494,8 +1369,7 @@ def run_generation(self):
     print("=" * 60)
     
     return True
-
-def create_gns3_nodes(self):
+  def create_gns3_nodes(self):
     """
     Create GNS3 nodes using DIRECT API method only (no templates needed)
     FIXED: Import issues resolved with multiple fallback options
@@ -1544,55 +1418,6 @@ def create_gns3_nodes(self):
             print("  2. diagnostic.py contains GNS3NetworkManager class")
             print("  3. No syntax errors in diagnostic.py")
             return False
-        
-        # STEP 2: CONNECT TO EXISTING PROJECT
-        print("\nStep 2: Connecting to existing GNS3 project...")
-        
-        existing_project_id = "9a8ab49a-6f61-4fa8-9089-99e6c6594e4f"
-        
-        self.gns3_manager = GNS3NetworkManager(
-            server_url=self.gns3_server_url,
-            username="admin", 
-            password="admin"
-        )
-        
-        self.gns3_manager.current_project_id = existing_project_id
-        self.gns3_project_id = existing_project_id
-        
-        print(f" Connected to project: {existing_project_id}")
-        
-        # STEP 3: VERIFY PROJECT ACCESS
-        print("\nStep 3: Verifying project access...")
-        
-        project_details = self.gns3_manager.get_project_details(existing_project_id)
-        if not project_details:
-            print("ERROR: Cannot access project. Check if GNS3 is running.")
-            return False
-        
-        print(f" Project: {project_details.get('name', 'Unknown')}")
-        
-        # Open project if needed
-        if project_details.get('status') != 'opened':
-            print("  Opening project...")
-            if not self.gns3_manager.open_project(existing_project_id):
-                print("ERROR: Failed to open project")
-                return False
-            print(" Project opened")
-        
-        # STEP 4: CHECK EXISTING NODES
-        print("\nStep 4: Checking existing nodes...")
-        
-        existing_nodes = self.gns3_manager.list_project_nodes(existing_project_id)
-        existing_node_names = {node.get('name') for node in existing_nodes}
-        
-        print(f" Found {len(existing_nodes)} existing nodes")
-        if existing_nodes:
-            print("  Existing nodes:")
-            for node in existing_nodes[:5]:  # Show first 5
-                print(f"    - {node.get('name')} ({node.get('node_type')})")
-            if len(existing_nodes) > 5:
-                print(f"    ... and {len(existing_nodes) - 5} more")
-        
         # STEP 5: CREATE NODES USING DIRECT API
         print("\nStep 5: Creating nodes using direct API...")
         
@@ -1612,17 +1437,12 @@ def create_gns3_nodes(self):
             device_name = device['name']
             device_type = device['type']
             device_ip = device['ip']
-            
-            if device_name in existing_node_names:
-                print(f"     Skipping {device_name} - already exists")
-                skipped_count += 1
-                continue
-            
+
             x_pos = x_start + (i * x_spacing)
-            y_pos = y_start
+            y_pos = y_start + (i* y_spacing)
             
             # Create node with direct API
-            if self._create_node_direct_simple(device_name, device_type, x_pos, y_pos):
+            if self.create_gns3_nodes():
                 created_count += 1
                 print(f"     Created {device_name} ({device_type})")
             else:
@@ -1649,18 +1469,15 @@ def create_gns3_nodes(self):
                 device_name = device['name']
                 device_type = device['type']
                 device_ip = device['ip']
-                
-                if device_name in existing_node_names:
-                    print(f"       Skipping {device_name} - already exists")
-                    skipped_count += 1
-                    continue
-                
+
                 # Position within department
                 x_pos = dept_x_start + (device_index % 4) * 120
                 y_pos = dept_y + (device_index // 4) * 100
-                
+
+                current_x = x_pos + 200  # Start below core infrastructure
+                current_y = y_pos + 200  # Start below core infrastructure
                 # Create node
-                if self._create_node_direct_simple(device_name, device_type, x_pos, y_pos):
+                if self.create_gns3_nodes():
                     created_count += 1
                     print(f"       Created {device_name} ({device_type})")
                 else:
@@ -1678,11 +1495,9 @@ def create_gns3_nodes(self):
         print(f" Skipped (already exist): {skipped_count}")
         print(f" Failed to create: {failed_count}")
         
-        # Update node tracking for links
-        final_nodes = self.gns3_manager.list_project_nodes(existing_project_id)
-        self.created_nodes = {node['name']: node for node in final_nodes}
+        # Update node tracking for links - nodes already stored during creation
         print(f"\n Ready for link creation with {len(self.created_nodes)} total nodes")
-        
+
         # Success if we created any nodes or if some already existed
         success = (created_count > 0) or (skipped_count > 0)
         return success
@@ -1693,8 +1508,7 @@ def create_gns3_nodes(self):
         print("Full error traceback:")
         traceback.print_exc()
         return False
-    
-def create_gns3_links(self):
+  def create_gns3_links(self):
     """
     Create network links between nodes based on discovered network topology
     Works with nodes already created by create_gns3_nodes()
@@ -1971,80 +1785,48 @@ def create_gns3_links(self):
         print(f"\nNo links were created. Check node availability.")
         return False
 
-def __init__(self, network_data_file: str = "automated/ansible_config/network_data.yml"):
+  def test_gns3_connection(generator):
     """
-    Initialize the GNS3 Network Manager with server connection parameters.
-    Sets up logging, loads configuration, and initializes component paths.
+    Test function to verify GNS3 connection without creating nodes
     """
-    # Core configuration and path setup
-    self.network_data_file = network_data_file
-    self.output_dir = "automated/ansible_config"
-    self.network_data = None
-    self.departments = []
-    self.core_infrastructure = []
-    
-    # Device type mappings for Ansible inventory organization
-    self.device_type_mapping = {
-        'switch': 'switches',
-        'router': 'routers',
-        'pc': 'pcs',           # PCs go to pcs group
-        'lp': 'pcs',           # Laptops also go to pcs group  
-        'server': 'servers',
-        'printer': 'printers'
-    }
-    
-    # GNS3 hardware specifications for different device types
-    # This mapping defines which GNS3 templates to use for each device type
-    self.gns3_hardware_mapping = {
-        'switch': {
-            'template_name': 'Cisco IOSv Switch',    # Cisco switch template
-            'node_type': 'dynamips',                 # Dynamips emulator
-            'properties': {'platform': 'c3745'},    # Cisco 3745 platform
-            'description': 'Managed Layer 2/3 Switch'
-        },
-        'router': {
-            'template_name': 'Cisco IOSv Router',    # Cisco router template
-            'node_type': 'dynamips',                 # Dynamips emulator
-            'properties': {'platform': 'c7200'},    # Cisco 7200 platform
-            'description': 'Layer 3 Router with routing capabilities'
-        },
-        'pc': {
-            'template_name': 'VPCS',                 # Virtual PC Simulator
-            'node_type': 'vpcs',                     # VPCS node type
-            'properties': {},                        # No special properties
-            'description': 'Virtual PC for end-user simulation'
-        },
-        'lp': {  # Laptops (from Guest Network department)
-            'template_name': 'VPCS',                 # Virtual PC Simulator
-            'node_type': 'vpcs',                     # VPCS node type
-            'properties': {},                        # No special properties
-            'description': 'Virtual Laptop for guest network simulation'
-        },
-        'server': {
-            'template_name': 'Ubuntu Server',        # Ubuntu server template
-            'node_type': 'docker',                   # Docker container
-            'properties': {'image': 'ubuntu:20.04'}, # Ubuntu 20.04 image
-            'description': 'Ubuntu Server container for services'
-        },
-        'printer': {
-            'template_name': 'VPCS',                 # Use VPCS for printer simulation
-            'node_type': 'vpcs',                     # VPCS node type
-            'properties': {},                        # No special properties
-            'description': 'Virtual Printer simulation using VPCS'
-        }
-    }
-    
-    # GNS3 server connection settings
-    self.gns3_server_url = "http://127.0.0.1:3080"  # Default GNS3 server URL
-    self.gns3_project_id = None                      # Will be set when connecting to project
-    
-    # ADD THESE TWO MISSING ATTRIBUTES FOR GNS3 NODE CREATION:
-    # =========================================================
-    self.gns3_manager = None                         # GNS3NetworkManager instance (set when connecting)
-    self.created_nodes = {}                          # Dictionary to track created nodes for linking
-    
-    # Load network configuration during initialization
-    self.load_network_config()  # Make sure this method exists and sets departments + core_infrastructure
+    try:
+        from automated.scripts.gns3.diagnostic import GNS3NetworkManager
+        
+        print("Testing GNS3 server connection...")
+        
+        # Test connection
+        gns3_manager = GNS3NetworkManager(
+            server_url=generator.gns3_server_url,
+            username="admin", 
+            password="admin"
+        )
+        
+        # Test project access
+        existing_project_id = "9a8ab49a-6f61-4fa8-9089-99e6c6594e4f"
+        project_details = gns3_manager.get_project_details(existing_project_id)
+        
+        if project_details:
+            print(f" GNS3 server connection: OK")
+            print(f" Project access: OK")
+            print(f"  Project name: {project_details.get('name', 'Unknown')}")
+            print(f"  Project status: {project_details.get('status', 'Unknown')}")
+            
+            # Check existing nodes
+            nodes = gns3_manager.list_project_nodes(existing_project_id)
+            print(f" Existing nodes in project: {len(nodes)}")
+            
+            return True
+        else:
+            print("✗ Cannot access GNS3 project")
+            return False
+            
+    except ImportError:
+        print("✗ Cannot import GNS3NetworkManager from diagnostic.py")
+        print("Make sure diagnostic.py is in automated/scripts/gns3/ folder")
+        return False
+    except Exception as e:
+        print(f"✗ GNS3 connection test failed: {e}")
+        return False
 
 def main():
     """
@@ -2056,6 +1838,7 @@ def main():
     
     # Initialize generator
     generator = NetworkAutomationGenerator()
+    generator.load_network_data()
     
     # Check if network data loaded successfully
     if not generator.departments:
@@ -2128,12 +1911,6 @@ def main():
             print(f"\n Partial success:")
             print(f"  Ansible: {'Success' if ansible_success else 'Not Success'}")
             print(f"  GNS3: {'Success' if gns3_success else 'Not Success'}")
-    
-    elif choice == "4":
-        # TEST GNS3 CONNECTION
-        print("\nTesting GNS3 connection...")
-        success = test_gns3_connection(generator)
-    
     else:
         print("Invalid choice. Please run again and select 1-4.")
         exit(1)
@@ -2148,49 +1925,5 @@ def main():
         print("GENERATION FAILED!")
         print("=" * 60)
         exit(1)
-
-def test_gns3_connection(generator):
-    """
-    Test function to verify GNS3 connection without creating nodes
-    """
-    try:
-        from automated.scripts.gns3.diagnostic import GNS3NetworkManager
-        
-        print("Testing GNS3 server connection...")
-        
-        # Test connection
-        gns3_manager = GNS3NetworkManager(
-            server_url=generator.gns3_server_url,
-            username="admin", 
-            password="admin"
-        )
-        
-        # Test project access
-        existing_project_id = "9a8ab49a-6f61-4fa8-9089-99e6c6594e4f"
-        project_details = gns3_manager.get_project_details(existing_project_id)
-        
-        if project_details:
-            print(f" GNS3 server connection: OK")
-            print(f" Project access: OK")
-            print(f"  Project name: {project_details.get('name', 'Unknown')}")
-            print(f"  Project status: {project_details.get('status', 'Unknown')}")
-            
-            # Check existing nodes
-            nodes = gns3_manager.list_project_nodes(existing_project_id)
-            print(f" Existing nodes in project: {len(nodes)}")
-            
-            return True
-        else:
-            print("✗ Cannot access GNS3 project")
-            return False
-            
-    except ImportError:
-        print("✗ Cannot import GNS3NetworkManager from diagnostic.py")
-        print("Make sure diagnostic.py is in automated/scripts/gns3/ folder")
-        return False
-    except Exception as e:
-        print(f"✗ GNS3 connection test failed: {e}")
-        return False
-
 if __name__ == "__main__":
     main()

@@ -1,15 +1,13 @@
 """
+Project 2 Eduardo Junqueira IPVC-ESTG ERSC
 GNS3 Network Authentication:
 All HTTP codes are here:https://umbraco.com/knowledge-base/http-status-codes/
 This file:
  prove if the http://127.0.0.1:3080 is works with Auth.
 Based on the OAuth2PasswordBearer requirement from  API docs is the best way to prove it.
 """
-##################################
-#Imports
-##################################
+
 import requests
-import json
 from urllib.parse import urlencode
 
 def try_oauth2_format():
