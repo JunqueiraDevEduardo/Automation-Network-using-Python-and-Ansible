@@ -1,18 +1,7 @@
-# University Network Automation Project - COMPLETE VERSION
+# University Network Automation Project
 
 ## Project Overview
-This project demonstrates the complete transformation of manual network deployment into fully automated infrastructure using Python, Ansible, and GNS3.
-
-## CRITICAL: Proper Deployment Sequence
-
-### The Problem This Solves
-Traditional network automation attempts to configure devices that don't exist yet. This project fixes that by creating the topology FIRST.
-
-### Correct Deployment Sequence:
-1. **Phase 1**: Create GNS3 topology (devices and links)
-2. **Phase 2**: Start and configure network devices  
-3. **Phase 3**: Configure end user devices
-4. **Phase 4**: Verification and testing
+This project demonstrates automated network deployment using Python and Ansible.
 
 ## Network Statistics
 - **Total Departments:** 10
@@ -21,98 +10,163 @@ Traditional network automation attempts to configure devices that don't exist ye
 - **Core Infrastructure:** 1 devices
 - **VLANs Configured:** 10
 
-## Usage Instructions - FIXED SEQUENCE
+## Network Architecture
 
-### Complete Network Deployment (RECOMMENDED)
+### Departments and VLANs
+
+#### Development/Engineering (VLAN 10)
+- **Subnet:** 192.168.10.0/28
+- **Gateway:** 192.168.10.1
+- **Total Devices:** 8
+
+**Device Details:**
+  - `SW-10-A` (switch): 192.168.10.250
+  - `PC-1-10` (pc): 192.168.10.2
+  - `PC-2-10` (pc): 192.168.10.3
+  - `PC-3-10` (pc): 192.168.10.4
+  - `PC-4-10` (pc): 192.168.10.5
+  - `PC-5-10` (pc): 192.168.10.6
+  - `R-10-A` (router): 192.168.10.1
+  - `Server-1-10` (server): 192.168.10.7
+
+#### Guest Network (VLAN 20)
+- **Subnet:** 192.168.20.0/28
+- **Gateway:** 192.168.20.1
+- **Total Devices:** 7
+
+**Device Details:**
+  - `SW-20-D` (switch): 192.168.20.250
+  - `LP-1-20` (pc): 192.168.20.2
+  - `LP-2-20` (pc): 192.168.20.3
+  - `LP-3-20` (pc): 192.168.20.4
+  - `LP-4-20` (pc): 192.168.20.5
+  - `LP-5-20` (pc): 192.168.20.6
+  - `R-20-D` (router): 192.168.20.1
+
+#### IT (VLAN 30)
+- **Subnet:** 192.168.30.0/28
+- **Gateway:** 192.168.30.1
+- **Total Devices:** 9
+
+**Device Details:**
+  - `SW-30-B` (switch): 192.168.30.250
+  - `PC-1-30` (pc): 192.168.30.2
+  - `PC-2-30` (pc): 192.168.30.3
+  - `PC-3-30` (pc): 192.168.30.4
+  - `PC-4-30` (pc): 192.168.30.5
+  - `PC-5-30` (pc): 192.168.30.6
+  - `PC-6-30` (pc): 192.168.30.7
+  - `R-30-B` (router): 192.168.30.1
+  - `Server-1-30` (server): 192.168.30.8
+
+#### Sales and Marketing (VLAN 40)
+- **Subnet:** 192.168.40.0/29
+- **Gateway:** 192.168.40.1
+- **Total Devices:** 6
+
+**Device Details:**
+  - `SW-40-C` (switch): 192.168.40.250
+  - `PC-1-40` (pc): 192.168.40.2
+  - `PC-2-40` (pc): 192.168.40.3
+  - `PC-3-40` (pc): 192.168.40.4
+  - `printer-1-40` (printer): 192.168.40.5
+  - `R-40-C` (router): 192.168.40.1
+
+#### Admin Department (VLAN 50)
+- **Subnet:** 192.168.50.0/29
+- **Gateway:** 192.168.50.1
+- **Total Devices:** 4
+
+**Device Details:**
+  - `SW-50-H` (switch): 192.168.50.250
+  - `PC-1-50` (pc): 192.168.50.2
+  - `PC-2-50` (pc): 192.168.50.3
+  - `R-50-H` (router): 192.168.50.1
+
+#### Human Resource Management (VLAN 60)
+- **Subnet:** 192.168.60.0/29
+- **Gateway:** 192.168.60.1
+- **Total Devices:** 5
+
+**Device Details:**
+  - `SW-60-E` (switch): 192.168.60.250
+  - `PC-1-60` (pc): 192.168.60.2
+  - `PC-2-60` (pc): 192.168.60.3
+  - `printer-1-60` (printer): 192.168.60.4
+  - `R-60-E` (router): 192.168.60.1
+
+#### Accounts and Finance (VLAN 70)
+- **Subnet:** 192.168.70.0/29
+- **Gateway:** 192.168.70.1
+- **Total Devices:** 5
+
+**Device Details:**
+  - `SW-70-E` (switch): 192.168.70.250
+  - `PC-1-70` (pc): 192.168.70.2
+  - `PC-2-70` (pc): 192.168.70.3
+  - `server-1-70` (server): 192.168.70.4
+  - `R-70-E` (router): 192.168.70.1
+
+#### Design (VLAN 80)
+- **Subnet:** 192.168.80.0/29
+- **Gateway:** 192.168.80.1
+- **Total Devices:** 4
+
+**Device Details:**
+  - `SW-80-J` (switch): 192.168.80.250
+  - `PC-1-80` (pc): 192.168.80.2
+  - `PC-2-80` (pc): 192.168.80.3
+  - `R-80-J` (router): 192.168.80.1
+
+#### Marketing (VLAN 90)
+- **Subnet:** 192.168.90.0/29
+- **Gateway:** 192.168.90.1
+- **Total Devices:** 4
+
+**Device Details:**
+  - `SW-90-I` (switch): 192.168.90.250
+  - `PC-1-90` (pc): 192.168.90.2
+  - `PC-2-90` (pc): 192.168.90.3
+  - `R-90-I` (router): 192.168.90.1
+
+#### Infrastructure & Security (VLAN 100)
+- **Subnet:** 192.168.0.0/23
+- **Gateway:** 192.168.0.1
+- **Total Devices:** 12
+
+**Device Details:**
+  - `SW-100-G` (switch): 192.168.0.250
+  - `PC-1-100` (pc): 192.168.0.8
+  - `PC-2-100` (pc): 192.168.0.9
+  - `PC-3-100` (pc): 192.168.0.10
+  - `PC-4-100` (pc): 192.168.0.11
+  - `R-100-G` (router): 192.168.0.1
+  - `Server-1-100` (server): 192.168.0.2
+  - `Server-2-100` (server): 192.168.0.3
+  - `Server-3-100` (server): 192.168.0.4
+  - `Server-4-100` (server): 192.168.0.5
+  - `Server-5-100` (server): 192.168.0.6
+  - `Server-6-100` (server): 192.168.0.7
+
+### Core Infrastructure
+- `CoreSwitch` (switch): 192.168.1.1
+
+## Usage Instructions
+
+### Complete Network Deployment
 ```bash
-# This runs the complete sequence correctly
 ansible-playbook site.yml
 ```
 
-This will:
-1. ✅ Create/verify GNS3 topology
-2. ✅ Start all network devices
-3. ✅ Configure network infrastructure
-4. ✅ Configure end devices
-5. ✅ Provide deployment summary
-
-### Individual Phase Deployment
+### Network Infrastructure Only
 ```bash
-# Phase 1: Create topology only
-ansible-playbook playbooks/01_create_topology.yml
-
-# Phase 2: Configure network devices only (after topology exists)
-ansible-playbook playbooks/02_configure_network.yml
-
-# Phase 3: Academic demonstration
-ansible-playbook playbooks/03_academic_demo.yml
+ansible-playbook playbooks/deploy_network.yml
 ```
 
-## Academic Benefits Demonstrated
-
-### Manual vs Automated Comparison
-- **Manual Setup**: 4-6 hours of device-by-device configuration
-- **Automated Setup**: 10-15 minutes with zero human error
-- **Consistency**: 100% identical results every deployment
-- **Scalability**: Same code works for 10 or 10,000 devices
-
-### Industry Standards Demonstrated
-- ✅ Infrastructure as Code (IaC)
-- ✅ Configuration Management
-- ✅ Version Control for Network Configs
-- ✅ Automated Testing and Validation
-- ✅ Documentation Generation
-
-## Troubleshooting
-
-### Common Issues FIXED
-1. **"Device unreachable" errors**: Now creates topology first
-2. **SSH connection timeouts**: Proper device startup sequence
-3. **Template not found**: All configs embedded in code
-4. **VLAN configuration failures**: Uses real values from YAML
-
-### Pre-Deployment Checklist
-1. ✅ GNS3 server running on http://127.0.0.1:3080
-2. ✅ network_data.yml exists and is valid
-3. ✅ Ansible cisco.ios collection installed
-4. ✅ Project ID matches your GNS3 project
-
-## File Structure Generated
-```
-ansibleconf/
-├── ansible.cfg                      # Ansible configuration
-├── inventories/hosts.yml            # Device inventory
-├── group_vars/                      # Device group variables
-├── roles/network-config/            # Network configuration role
-├── playbooks/
-│   ├── 01_create_topology.yml       # GNS3 topology creation
-│   ├── 02_configure_network.yml     # Network device config
-│   └── 03_academic_demo.yml         # Academic demonstration
-├── site.yml                         # Complete deployment
-└── README.md                        # This documentation
-```
-
-## Academic Paper Points
-
-### Problem Statement
-Manual network configuration is:
-- Time-consuming (hours vs minutes)
-- Error-prone (human mistakes)
-- Inconsistent (different results each time)
-- Unscalable (doesn't work for large networks)
-
-### Solution Demonstrated
-Automated network deployment using:
-- **Python**: Orchestration and logic
-- **Ansible**: Configuration management
-- **YAML**: Human-readable configuration
-- **GNS3**: Virtual network simulation
-
-### Results Achieved
-- ⚡ 90% reduction in deployment time
-- 🎯 100% consistency across deployments  
-- 📈 Scalable to any network size
-- 📝 Complete documentation and audit trail
-- 🔄 Fully repeatable processes
-
-This demonstrates the practical application of software engineering principles to network infrastructure management.
+## Generated Files
+- `ansible.cfg` - Ansible configuration
+- `inventories/hosts.yml` - Device inventory
+- `group_vars/` - Device group variables
+- `roles/network-config/` - Network configuration role
+- `site.yml` - Complete deployment playbook
+- `playbooks/deploy_network.yml` - Network infrastructure only
