@@ -1,0 +1,71 @@
+---
+# End Devices Configuration Tasks
+
+# Configure network interface using netplan
+- name: Configure network interface using netplan
+  copy:
+    content: |
+      network:
+        version: 2
+        renderer: networkd
+        ethernets:
+          {{ ansible_default_ipv4.interface | default('eth0') }}:
+            addresses:
+              - {{ ansible_host }}/{{ subnet.split('/')[1] }}
+            gateway4: {{ gateway }}
+            nameservers:
+              addresses:
+                - 8.8.8.8
+                - 8.8.4.4
+              search:
+                - company.local
+    dest: /etc/netplan/01-network-config.yaml
+    backup: yes
+  when: 
+    - ansible_os_family == "Debian"
+    - ansible_distribution_major_version|int >= 18
+  notify: apply netplan
+  tags: [network, ubuntu]
+
+# Install basic packages for PCs and servers
+- name: Install basic packages for PCs and servers
+  package:
+    name: "{{ basic_packages }}"
+    state: present
+  when: device_type in ["pc", "server"]
+  tags: [packages]
+
+# Install server additional packages
+- name: Install server additional packages
+  package:
+    name: "{{ server_packages }}"
+    state: present
+  when: device_type == "server"
+  tags: [packages, servers]
+
+# Configure DNS resolver
+- name: Configure DNS resolver for all end devices
+  copy:
+    content: |
+      nameserver 8.8.8.8
+      nameserver 8.8.4.4
+      search company.local
+    dest: /etc/resolv.conf
+    backup: yes
+  tags: [dns]
+
+# Set hostname
+- name: Set hostname for all end devices
+  hostname:
+    name: "{{ inventory_hostname }}"
+  tags: [hostname]
+
+# Configure printer services
+- name: Configure printer services for printers only
+  service:
+    name: cups
+    state: started
+    enabled: yes
+  when: device_type == "printer"
+  ignore_errors: yes
+  tags: [printers]
