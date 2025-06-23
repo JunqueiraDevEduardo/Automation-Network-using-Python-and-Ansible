@@ -1,1044 +1,590 @@
 """
-Project 2 Eduardo Junqueira IPVC-ESTG ERSC
-Network Automation Generator V2
-Reads network_data.yml and generates complete Ansible automation structure
-Creates proper inventory, playbooks, roles, and configuration files
+Interactive Network Data Generator V2
+Eduardo Junqueira IPVC-ESTG ERSC
+
+This script allows users to interactively create network_data.yml
+Users can customize:
+- Number of departments
+- Department names and VLANs
+- Device types and quantities
+- IP addressing schemes
+- Network topology
+
+After generation, it can automatically run the Ansible generator
 """
 
 import yaml
+import ipaddress
 import os
+import re
 from pathlib import Path
 
-class NetworkAutomationGenerator:
+class InteractiveNetworkGenerator:
     """
-    Main generator class that converts network_data.yml into complete Ansible automation
-    Creates proper directory structure, inventory, playbooks, and configuration files
-    All templates embedded in code - no external template files needed
+    Interactive generator that creates network_data.yml based on user input
+    Provides a user-friendly interface for designing network topologies
     """
-    def __init__(self, network_data_file: str = "network_data.yml"):
-        """
-        Initialize Network Automation Generator
-        """
-        
-        # File and directory configuration
-        self.network_data_file = network_data_file
-        self.output_dir = "ansibleconf"
-        
-        # Data containers - populated when loading YAML configuration
-        self.network_data = None
-        self.departments = []
-        self.core_infrastructure = []
-        
-        # Ansible inventory grouping - maps device types to Ansible groups
-        self.device_type_mapping = {
-            'switch': 'switches',
-            'router': 'routers',
-            'pc': 'pcs',
-            'lp': 'pcs',        # Laptops grouped with PCs
-            'server': 'servers',
-            'printer': 'printers'
+    
+    def __init__(self):
+        """Initialize the interactive network generator"""
+        self.network_data = {
+            'departments': [],
+            'core_infrastructure': []
         }
-
-    def load_network_data(self):
-        """
-        Load network configuration from YAML file.
-        """
-        try:
-            # Check if configuration file exists
-            if not os.path.exists(self.network_data_file):
-                print(f"Error: Network data file {self.network_data_file} not found")
-                return False
-            
-            # Load and parse YAML file
-            with open(self.network_data_file, 'r') as f:
-                self.network_data = yaml.safe_load(f)
-            
-            # Validate loaded data structure
-            if not isinstance(self.network_data, dict):
-                print("Error: Invalid YAML structure - expected dictionary")
-                return False
-            
-            # Extract network components
-            self.departments = self.network_data.get('departments', [])
-            self.core_infrastructure = self.network_data.get('core_infrastructure', [])
-            
-            # Validate extracted data
-            if not self.departments:
-                print("Warning: No departments found in configuration")
-            
-            print(f"Loaded: {len(self.departments)} departments, {len(self.core_infrastructure)} core devices")
-            return True
-            
-        except yaml.YAMLError as e:
-            print(f"YAML parsing error: {e}")
-            return False
-        except Exception as e:
-            print(f"File loading error: {e}")
-            return False
-
-    def create_directory_structure(self):
-        """
-        Create folders for network automation files.
-        FIXED: Now creates all required directories including group_vars
-        """
+        self.used_vlans = set()
+        self.used_subnets = set()
         
-        # Main folder - holds all automation files
-        Path(self.output_dir).mkdir(exist_ok=True)
-        
-        # Inventories folder - device lists with IPs
-        Path(self.output_dir + "/inventories").mkdir(exist_ok=True)
-        
-        # Playbooks folder - automation scripts
-        Path(self.output_dir + "/playbooks").mkdir(exist_ok=True)
-        
-        # FIXED: Create group_vars directory
-        Path(self.output_dir + "/group_vars").mkdir(exist_ok=True)
-        
-        # Tasks folder - Cisco commands for switch and router configuration
-        Path(self.output_dir + "/roles/network-config/tasks").mkdir(parents=True, exist_ok=True)
-        
-        # Variables folder - VLAN numbers and IP address ranges
-        Path(self.output_dir + "/roles/network-config/vars").mkdir(exist_ok=True)
-        
-        # Handlers folder - for service restarts
-        Path(self.output_dir + "/roles/network-config/handlers").mkdir(exist_ok=True)
-        
-        print(f"Created network automation folders in {self.output_dir}")
-
-    def generate_ansible_cfg(self):
-        """
-        Generate ansible.cfg file with network device settings.
-        """
-        
-        config_content = """[defaults]
-# Basic Ansible settings for network automation
-inventory = inventories/hosts.yml
-remote_user = admin
-host_key_checking = False
-timeout = 30
-retry_files_enabled = False
-gathering = explicit
-stdout_callback = yaml
-forks = 10
-
-[persistent_connection]
-# Network device connection timeouts
-connect_timeout = 30
-command_timeout = 30
-
-[ssh_connection]
-# SSH optimization for network devices
-ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
-pipelining = True
-
-[privilege_escalation]
-# Enable mode for network devices
-become = True
-become_method = enable
-become_user = admin
-become_ask_pass = False
-"""
-        
-        # Write configuration file to output directory
-        with open(f"{self.output_dir}/ansible.cfg", 'w') as f:
-            f.write(config_content)
-        
-        print("Generated ansible.cfg for network device automation")
-
-    def generate_inventory(self):
-        """
-        Generate Ansible inventory from network_data.yml
-        Uses only real values from network configuration
-        """
-        # Initialize basic inventory structure with device type groups
-        inventory = {
-            'all': {
-                'children': {
-                    'switches': {'hosts': {}},
-                    'routers': {'hosts': {}},
-                    'pcs': {'hosts': {}},
-                    'servers': {'hosts': {}},
-                    'printers': {'hosts': {}},
-                    'core_infrastructure': {'hosts': {}}
-                }
-            }
+        # Common device types
+        self.device_types = {
+            '1': 'switch',
+            '2': 'router', 
+            '3': 'pc',
+            '4': 'server',
+            '5': 'printer'
         }
         
-        # Process core infrastructure devices
-        for device in self.core_infrastructure:
-            device_name = device['name']
-            device_info = {
-                'ansible_host': device['ip'],
-                'device_type': device['type'],
-                'department': 'core'
-            }
-            inventory['all']['children']['core_infrastructure']['hosts'][device_name] = device_info
-        
-        # Process each department using only real values
-        for dept in self.departments:
-            dept_name = dept['name']
-            vlan_id = dept['vlan']
-            subnet = dept['subnet']
-            gateway = dept['gateway']
-            devices = dept.get('devices', [])
-            
-            # Create department-specific group
-            dept_group_name = f"dept_{vlan_id}"
-            inventory['all']['children'][dept_group_name] = {
-                'hosts': {},
-                'vars': {
-                    'department': dept_name,
-                    'vlan_id': vlan_id,
-                    'subnet': subnet,
-                    'gateway': gateway
-                }
-            }
-            
-            # Process each device in the department
-            for device in devices:
-                device_name = device['name']
-                device_type = device['type']
-                device_ip = device['ip']
-                
-                # Create device information with real values
-                device_info = {
-                    'ansible_host': device_ip,
-                    'device_type': device_type,
-                    'department': dept_name,
-                    'vlan_id': vlan_id,
-                    'subnet': subnet,
-                    'gateway': gateway
-                }
-                
-                # Add connection settings based on device type
-                if device_type in ['switch', 'router']:
-                    device_info.update({
-                        'ansible_network_os': 'ios',
-                        'ansible_connection': 'network_cli',
-                        'ansible_user': 'admin',
-                        'ansible_password': 'admin',
-                        'ansible_become': 'yes',
-                        'ansible_become_method': 'enable'
-                    })
-                elif device_type in ['pc', 'server', 'printer']:
-                    device_info.update({
-                        'ansible_connection': 'ssh',
-                        'ansible_user': 'admin',
-                        'ansible_become': 'yes',
-                        'ansible_become_method': 'sudo'
-                    })
-                
-                # Place device in correct group
-                if device_type in self.device_type_mapping:
-                    group_name = self.device_type_mapping[device_type]
-                    inventory['all']['children'][group_name]['hosts'][device_name] = device_info
+        # Color codes for output
+        self.colors = {
+            'header': '\033[95m',
+            'blue': '\033[94m',
+            'cyan': '\033[96m',
+            'green': '\033[92m',
+            'yellow': '\033[93m',
+            'red': '\033[91m',
+            'end': '\033[0m',
+            'bold': '\033[1m'
+        }
+
+    def print_colored(self, text, color='end'):
+        """Print colored text for better user experience"""
+        print(f"{self.colors.get(color, '')}{text}{self.colors['end']}")
+
+    def print_header(self, text):
+        """Print a formatted header"""
+        self.print_colored("=" * 60, 'cyan')
+        self.print_colored(text.center(60), 'header')
+        self.print_colored("=" * 60, 'cyan')
+
+    def print_section(self, text):
+        """Print a formatted section header"""
+        self.print_colored(f"\n{text}", 'blue')
+        self.print_colored("-" * len(text), 'blue')
+
+    def get_user_input(self, prompt, input_type='str', validation=None, default=None):
+        """
+        Get validated user input with proper error handling
+        """
+        while True:
+            try:
+                if default:
+                    user_input = input(f"{prompt} [{default}]: ").strip()
+                    if not user_input:
+                        user_input = default
                 else:
-                    print(f"Warning: Unknown device type '{device_type}' for device '{device_name}'")
+                    user_input = input(f"{prompt}: ").strip()
                 
-                # Also add device to its department group
-                inventory['all']['children'][dept_group_name]['hosts'][device_name] = device_info
-        
-        # Save inventory file
-        with open(f"{self.output_dir}/inventories/hosts.yml", 'w') as f:
-            yaml.dump(inventory, f, default_flow_style=False, indent=2, sort_keys=False)
-        
-        # Count total devices for confirmation
-        total_devices = sum(len(group['hosts']) for group in inventory['all']['children'].values())
-        print(f"Generated inventory: {total_devices} devices in {self.output_dir}/inventories/hosts.yml")
+                if not user_input:
+                    self.print_colored("Input cannot be empty. Please try again.", 'red')
+                    continue
+                
+                # Type conversion
+                if input_type == 'int':
+                    user_input = int(user_input)
+                elif input_type == 'float':
+                    user_input = float(user_input)
+                
+                # Validation
+                if validation and not validation(user_input):
+                    self.print_colored("Invalid input. Please try again.", 'red')
+                    continue
+                
+                return user_input
+                
+            except ValueError:
+                self.print_colored(f"Please enter a valid {input_type}.", 'red')
+            except KeyboardInterrupt:
+                self.print_colored("\nOperation cancelled by user.", 'yellow')
+                exit(0)
 
-    def generate_group_department(self):
-        """
-        Generate group variables for device types and departments
-        FIXED: Now writes to the correct group_vars directory
-        """
-        
-        # Variables for switches group
-        switches_vars = {
-            'ansible_network_os': 'ios',
-            'ansible_connection': 'network_cli',
-            'ansible_user': 'admin',
-            'ansible_password': 'admin',
-            'ansible_become': 'yes',
-            'ansible_become_method': 'enable',
-            'dns_servers': ['8.8.8.8', '8.8.4.4'],
-            'domain_name': 'company.local'
-        }
-        
-        with open(f"{self.output_dir}/group_vars/switches.yml", 'w') as f:
-            yaml.dump(switches_vars, f, default_flow_style=False, indent=2)
-        
-        # Variables for routers group
-        routers_vars = {
-            'ansible_network_os': 'ios',
-            'ansible_connection': 'network_cli',
-            'ansible_user': 'admin',
-            'ansible_password': 'admin',
-            'ansible_become': 'yes',
-            'ansible_become_method': 'enable',
-            'dns_servers': ['8.8.8.8', '8.8.4.4'],
-            'domain_name': 'company.local'
-        }
-        
-        with open(f"{self.output_dir}/group_vars/routers.yml", 'w') as f:
-            yaml.dump(routers_vars, f, default_flow_style=False, indent=2)
-        
-        # Variables for PCs group
-        pcs_vars = {
-            'ansible_connection': 'ssh',
-            'ansible_user': 'admin',
-            'ansible_become': 'yes',
-            'ansible_become_method': 'sudo',
-            'dns_servers': ['8.8.8.8', '8.8.4.4'],
-            'domain_name': 'company.local'
-        }
-        
-        with open(f"{self.output_dir}/group_vars/pcs.yml", 'w') as f:
-            yaml.dump(pcs_vars, f, default_flow_style=False, indent=2)
-        
-        # Variables for servers group
-        servers_vars = {
-            'ansible_connection': 'ssh',
-            'ansible_user': 'admin',
-            'ansible_become': 'yes',
-            'ansible_become_method': 'sudo',
-            'dns_servers': ['8.8.8.8', '8.8.4.4'],
-            'domain_name': 'company.local'
-        }
-        
-        with open(f"{self.output_dir}/group_vars/servers.yml", 'w') as f:
-            yaml.dump(servers_vars, f, default_flow_style=False, indent=2)
-        
-        # Variables for printers group
-        printers_vars = {
-            'ansible_connection': 'ssh',
-            'ansible_user': 'admin',
-            'ansible_become': 'yes',
-            'ansible_become_method': 'sudo',
-            'dns_servers': ['8.8.8.8', '8.8.4.4'],
-            'domain_name': 'company.local'
-        }
-        
-        with open(f"{self.output_dir}/group_vars/printers.yml", 'w') as f:
-            yaml.dump(printers_vars, f, default_flow_style=False, indent=2)
-        
-        # Variables for core infrastructure
-        core_vars = {
-            'ansible_network_os': 'ios',
-            'ansible_connection': 'network_cli',
-            'ansible_user': 'admin',
-            'ansible_password': 'admin',
-            'ansible_become': 'yes',
-            'ansible_become_method': 'enable',
-            'dns_servers': ['8.8.8.8', '8.8.4.4'],
-            'domain_name': 'company.local'
-        }
-        
-        with open(f"{self.output_dir}/group_vars/core_infrastructure.yml", 'w') as f:
-            yaml.dump(core_vars, f, default_flow_style=False, indent=2)
-        
-        # Generate department-specific group variables
-        for dept in self.departments:
-            dept_name = dept['name']
-            vlan_id = dept['vlan']
-            subnet = dept['subnet']
-            gateway = dept['gateway']
-            
-            dept_vars = {
-                'department_name': dept_name,
-                'vlan_id': vlan_id,
-                'subnet': subnet,
-                'gateway': gateway,
-                'vlan_name': dept_name.replace('/', '-').replace(' ', '-').replace('&', 'and')
-            }
-            
-            with open(f"{self.output_dir}/group_vars/dept_{vlan_id}.yml", 'w') as f:
-                yaml.dump(dept_vars, f, default_flow_style=False, indent=2)
-        
-        print("Generated group variables for all device types and departments")
-        print(f"Created {len(self.departments) + 6} group variable files")
-
-    def generate_network_role(self):
-        """
-        Generate complete network configuration role for switches and routers
-        """
-        
-        network_tasks = """---
-# Network Configuration Tasks for Switches and Routers Only
-
-# Configure VLANs on switches using real department data
-- name: Configure department VLANs on switches
-  cisco.ios.ios_vlans:
-    config: "{{ department_vlans }}"
-    state: merged
-  when: device_type == "switch"
-  tags: [vlans, switches]
-
-# Configure basic switch settings
-- name: Configure switch base configuration
-  cisco.ios.ios_config:
-    lines:
-      - "hostname {{ inventory_hostname }}"
-      - "service password-encryption"
-      - "ip domain-name {{ domain_name }}"
-      - "enable secret admin"
-      - "username admin privilege 15 secret admin"
-      - "crypto key generate rsa modulus 1024"
-      - "ip ssh version 2"
-    parents: []
-  when: device_type == "switch"
-  tags: [base_config, switches]
-
-# Configure switch management interface with real subnet mask
-- name: Configure switch management interface
-  cisco.ios.ios_config:
-    lines:
-      - "ip address {{ ansible_host }} {{ subnet | ipaddr('netmask') }}"
-      - "no shutdown"
-      - "description Management Interface for {{ department }}"
-    parents: interface vlan1
-  when: device_type == "switch"
-  tags: [mgmt_interface, switches]
-
-# Configure default gateway for switches
-- name: Configure switch default gateway
-  cisco.ios.ios_config:
-    lines:
-      - "ip default-gateway {{ gateway }}"
-    parents: []
-  when: device_type == "switch"
-  tags: [gateway, switches]
-
-# Configure router base settings
-- name: Configure router base configuration
-  cisco.ios.ios_config:
-    lines:
-      - "hostname {{ inventory_hostname }}"
-      - "service password-encryption"
-      - "ip domain-name {{ domain_name }}"
-      - "enable secret admin"
-      - "username admin privilege 15 secret admin"
-      - "ip routing"
-      - "ip cef"
-      - "crypto key generate rsa modulus 1024"
-      - "ip ssh version 2"
-    parents: []
-  when: device_type == "router"
-  tags: [base_config, routers]
-
-# Configure router department interface
-- name: Configure router department LAN interface
-  cisco.ios.ios_config:
-    lines:
-      - "ip address {{ ansible_host }} {{ subnet | ipaddr('netmask') }}"
-      - "no shutdown"
-      - "description {{ department }} Department LAN Gateway"
-    parents: interface GigabitEthernet0/0
-  when: device_type == "router"
-  tags: [interfaces, routers]
-
-# Configure SSH access for all network devices
-- name: Configure VTY lines for SSH access
-  cisco.ios.ios_config:
-    lines:
-      - "login local"
-      - "transport input ssh"
-      - "exec-timeout 30 0"
-    parents: line vty 0 15
-  when: device_type in ["switch", "router"]
-  tags: [ssh_access, network_devices]
-
-# Save configuration on all network devices
-- name: Save running configuration
-  cisco.ios.ios_config:
-    save_when: always
-  when: device_type in ["switch", "router"]
-  tags: [save, network_devices]
-"""
-        
-        # Write the tasks file
-        with open(f"{self.output_dir}/roles/network-config/tasks/main.yml", 'w') as f:
-            f.write(network_tasks)
-        
-        # Generate role variables using real department data
-        network_vars = {
-            'domain_name': 'company.local',
-            'department_vlans': []
-        }
-        
-        # Generate VLAN configurations using real department data
-        for dept in self.departments:
-            vlan_id = dept['vlan']
-            dept_name = dept['name']
-            clean_vlan_name = dept_name.replace('/', '-').replace(' ', '-').replace('&', 'and')
-            
-            network_vars['department_vlans'].append({
-                'vlan_id': vlan_id,
-                'name': clean_vlan_name,
-                'state': 'active'
-            })
-        
-        # Write the variables file
-        with open(f"{self.output_dir}/roles/network-config/vars/main.yml", 'w') as f:
-            yaml.dump(network_vars, f, default_flow_style=False, indent=2)
-        
-        print("Generated complete network configuration role for switches and routers")
-        print(f"Created VLAN configurations for {len(self.departments)} departments")
-
-    def generate_end_devices_role(self):
-        """
-        Generate end devices configuration role for PCs, servers, and printers
-        """
-        
-        end_devices_tasks = """---
-# End Devices Configuration Tasks
-
-# Configure network interface using netplan
-- name: Configure network interface using netplan
-  copy:
-    content: |
-      network:
-        version: 2
-        renderer: networkd
-        ethernets:
-          {{ ansible_default_ipv4.interface | default('eth0') }}:
-            addresses:
-              - {{ ansible_host }}/{{ subnet.split('/')[1] }}
-            gateway4: {{ gateway }}
-            nameservers:
-              addresses:
-                - 8.8.8.8
-                - 8.8.4.4
-              search:
-                - company.local
-    dest: /etc/netplan/01-network-config.yaml
-    backup: yes
-  when: 
-    - ansible_os_family == "Debian"
-    - ansible_distribution_major_version|int >= 18
-  notify: apply netplan
-  tags: [network, ubuntu]
-
-# Install basic packages for PCs and servers
-- name: Install basic packages for PCs and servers
-  package:
-    name: "{{ basic_packages }}"
-    state: present
-  when: device_type in ["pc", "server"]
-  tags: [packages]
-
-# Install server additional packages
-- name: Install server additional packages
-  package:
-    name: "{{ server_packages }}"
-    state: present
-  when: device_type == "server"
-  tags: [packages, servers]
-
-# Configure DNS resolver
-- name: Configure DNS resolver for all end devices
-  copy:
-    content: |
-      nameserver 8.8.8.8
-      nameserver 8.8.4.4
-      search company.local
-    dest: /etc/resolv.conf
-    backup: yes
-  tags: [dns]
-
-# Set hostname
-- name: Set hostname for all end devices
-  hostname:
-    name: "{{ inventory_hostname }}"
-  tags: [hostname]
-
-# Configure printer services
-- name: Configure printer services for printers only
-  service:
-    name: cups
-    state: started
-    enabled: yes
-  when: device_type == "printer"
-  ignore_errors: yes
-  tags: [printers]
-"""
-        
-        # Write tasks file
-        with open(f"{self.output_dir}/roles/network-config/tasks/end_devices.yml", 'w') as f:
-            f.write(end_devices_tasks)
-        
-        # Create handlers
-        end_devices_handlers = """---
-# End Devices Configuration Handlers
-
-- name: apply netplan
-  command: netplan apply
-  become: yes
-
-- name: restart network
-  service:
-    name: network
-    state: restarted
-  become: yes
-"""
-        
-        # Write handlers file
-        with open(f"{self.output_dir}/roles/network-config/handlers/main.yml", 'w') as f:
-            f.write(end_devices_handlers)
-        
-        # Define variables for end device configuration
-        end_devices_vars = {
-            'basic_packages': [
-                'curl', 'wget', 'net-tools', 'openssh-server', 'htop', 'vim', 'git'
-            ],
-            'server_packages': [
-                'nginx', 'mysql-server', 'fail2ban', 'ufw', 'rsync'
-            ],
-            'update_packages': False,
-            'domain_name': 'company.local'
-        }
-        
-        # Read existing variables and merge
-        vars_file = f"{self.output_dir}/roles/network-config/vars/main.yml"
-        try:
-            with open(vars_file, 'r') as f:
-                existing_vars = yaml.safe_load(f) or {}
-        except FileNotFoundError:
-            existing_vars = {}
-        
-        existing_vars.update(end_devices_vars)
-        
-        # Write updated variables file
-        with open(vars_file, 'w') as f:
-            yaml.dump(existing_vars, f, default_flow_style=False, indent=2)
-        
-        print("Generated end devices configuration for PCs, servers, and printers")
-
-    def generate_playbooks(self):
-        """
-        Generate main playbooks for network deployment
-        """
-        
-        # Main site deployment playbook
-        site_playbook = """---
-# Main Site Deployment Playbook
-
-# Configure Network Infrastructure Devices
-- name: Configure Network Infrastructure Devices
-  hosts: switches:routers:core_infrastructure
-  gather_facts: no
-  connection: network_cli
-  vars:
-    ansible_network_os: ios
-    ansible_user: admin
-    ansible_password: admin
-  roles:
-    - network-config
-  tags: [network, infrastructure, switches, routers]
-
-# Configure End User Devices  
-- name: Configure End User Devices
-  hosts: pcs:servers:printers
-  gather_facts: yes
-  become: yes
-  connection: ssh
-  vars:
-    ansible_user: admin
-  roles:
-    - network-config
-  tags: [endpoints, end_devices, pcs, servers, printers]
-"""
-        
-        with open(f"{self.output_dir}/site.yml", 'w') as f:
-            f.write(site_playbook)
-        
-        # Network devices only playbook
-        network_playbook = f"""---
-# Network Infrastructure Only Playbook
-
-- name: Configure Network Infrastructure Only
-  hosts: switches:routers:core_infrastructure
-  gather_facts: no
-  connection: network_cli
-  vars:
-    ansible_network_os: ios
-    ansible_user: admin
-    ansible_password: admin
-  
-  tasks:
-    # Configure department VLANs on switches
-    - name: Configure department VLANs on switches using real data
-      cisco.ios.ios_vlans:
-        config:"""
-        
-        # Add VLAN configurations
-        for dept in self.departments:
-            vlan_id = dept['vlan']
-            dept_name = dept['name']
-            clean_name = dept_name.replace('/', '-').replace(' ', '-').replace('&', 'and')
-            network_playbook += f"""
-          - vlan_id: {vlan_id}
-            name: "{clean_name}"
-            state: active"""
-        
-        network_playbook += """
-        state: merged
-      when: device_type == "switch"
-      tags: [vlans, switches]
-
-    # Save configuration
-    - name: Save running configuration
-      cisco.ios.ios_config:
-        save_when: always
-      when: device_type in ["switch", "router"]
-      tags: [save, network_devices]
-"""
-        
-        with open(f"{self.output_dir}/playbooks/deploy_network.yml", 'w') as f:
-            f.write(network_playbook)
-        
-        print("Generated complete set of playbooks")
-        print(f"Configured {len(self.departments)} department VLANs using real data")
-
-    def generate_network_documentation(self):
-        """
-        Generate comprehensive network documentation
-        """
-        
-        total_dept_devices = sum(len(dept['devices']) for dept in self.departments)
-        total_devices = total_dept_devices + len(self.core_infrastructure)
-        
-        readme_content = f"""# University Network Automation Project
-
-## Project Overview
-This project demonstrates automated network deployment using Python and Ansible.
-
-## Network Statistics
-- **Total Departments:** {len(self.departments)}
-- **Total Network Devices:** {total_devices}
-- **Department Devices:** {total_dept_devices}
-- **Core Infrastructure:** {len(self.core_infrastructure)} devices
-- **VLANs Configured:** {len(self.departments)}
-
-## Network Architecture
-
-### Departments and VLANs
-"""
-        
-        # Add department information
-        for dept in self.departments:
-            dept_name = dept['name']
-            vlan_id = dept['vlan']
-            subnet = dept['subnet']
-            gateway = dept['gateway']
-            devices = dept['devices']
-            
-            readme_content += f"""
-#### {dept_name} (VLAN {vlan_id})
-- **Subnet:** {subnet}
-- **Gateway:** {gateway}
-- **Total Devices:** {len(devices)}
-
-**Device Details:**
-"""
-            
-            for device in devices:
-                device_name = device['name']
-                device_type = device['type']
-                device_ip = device['ip']
-                readme_content += f"  - `{device_name}` ({device_type}): {device_ip}\n"
-        
-        # Add core infrastructure
-        readme_content += f"""
-### Core Infrastructure
-"""
-        for device in self.core_infrastructure:
-            device_name = device['name']
-            device_type = device['type']
-            device_ip = device['ip']
-            readme_content += f"- `{device_name}` ({device_type}): {device_ip}\n"
-        
-        readme_content += """
-## Usage Instructions
-
-### Complete Network Deployment
-```bash
-ansible-playbook site.yml
-```
-
-### Network Infrastructure Only
-```bash
-ansible-playbook playbooks/deploy_network.yml
-```
-
-## Generated Files
-- `ansible.cfg` - Ansible configuration
-- `inventories/hosts.yml` - Device inventory
-- `group_vars/` - Device group variables
-- `roles/network-config/` - Network configuration role
-- `site.yml` - Complete deployment playbook
-- `playbooks/deploy_network.yml` - Network infrastructure only
-"""
-        
-        # Write README file
-        with open(f"{self.output_dir}/README.md", 'w') as f:
-            f.write(readme_content)
-        
-        print("Generated comprehensive project documentation")
-
-    def run_generation(self):
-        """
-        Main execution method - FIXED VERSION
-        """
-        
-        print("Network Automation Generator for University Project")
-        print("Manual to Automated Network Deployment Transformation")
-        print("=" * 60)
-        print(f"Source Configuration: {self.network_data_file}")
-        print(f"Output Directory: {self.output_dir}")
-        print("=" * 60)
-        
-        # PHASE 1: Load network configuration
-        print("\nPHASE 1: Loading Network Configuration Data")
-        print("-" * 45)
-        
-        if not self.load_network_data():
-            print("ERROR: Failed to load network configuration data")
+    def validate_vlan_id(self, vlan_id):
+        """Validate VLAN ID"""
+        if vlan_id < 1 or vlan_id > 4094:
+            self.print_colored("VLAN ID must be between 1 and 4094.", 'red')
             return False
-        
-        print("Successfully loaded network configuration")
-        print(f"Found {len(self.departments)} departments")
-        print(f"Found {len(self.core_infrastructure)} core infrastructure devices")
-        
-        total_devices = sum(len(dept['devices']) for dept in self.departments) + len(self.core_infrastructure)
-        print(f"Total devices to configure: {total_devices}")
-        
-        # PHASE 2: Create directory structure
-        print("\nPHASE 2: Creating Ansible Project Structure")
-        print("-" * 45)
-        
-        try:
-            self.create_directory_structure()
-            print("Created simplified Ansible directory structure")
-        except Exception as e:
-            print(f"ERROR: Failed to create directory structure: {e}")
+        if vlan_id in self.used_vlans:
+            self.print_colored(f"VLAN {vlan_id} is already used. Please choose another.", 'red')
             return False
-        
-        # PHASE 3: Generate core configuration
-        print("\nPHASE 3: Generating Core Ansible Configuration")
-        print("-" * 45)
-        
-        try:
-            self.generate_ansible_cfg()
-            print("Generated ansible.cfg with network automation settings")
-            
-            self.generate_inventory()
-            print("Generated inventory with exact IP addresses from network_data.yml")
-            
-            self.generate_group_department()
-            print("Generated group variables for all device types")
-            
-        except Exception as e:
-            print(f"ERROR: Failed to generate core configuration: {e}")
-            return False
-        
-        # PHASE 4: Generate network role
-        print("\nPHASE 4: Generating Unified Network Configuration Role")
-        print("-" * 45)
-        
-        try:
-            self.generate_network_role()
-            print("Generated unified network-config role")
-            print(f"Configured {len(self.departments)} department VLANs")
-            
-            self.generate_end_devices_role()
-            print("Generated end devices configuration")
-            
-        except Exception as e:
-            print(f"ERROR: Failed to generate network role: {e}")
-            return False
-        
-        # PHASE 5: Generate playbooks
-        print("\nPHASE 5: Generating Deployment Playbooks")
-        print("-" * 45)
-        
-        try:
-            self.generate_playbooks()
-            print("Generated complete set of deployment playbooks")
-            
-        except Exception as e:
-            print(f"ERROR: Failed to generate playbooks: {e}")
-            return False
-        
-        # PHASE 6: Generate documentation
-        print("\nPHASE 6: Generating Project Documentation")
-        print("-" * 45)
-        
-        try:
-            self.generate_network_documentation()
-            print("Generated comprehensive project documentation")
-            
-        except Exception as e:
-            print(f"ERROR: Failed to generate documentation: {e}")
-            return False
-        
-        # Success summary
-        print("\n" + "=" * 60)
-        print("NETWORK AUTOMATION GENERATION COMPLETED SUCCESSFULLY")
-        print("=" * 60)
-        
-        print(f"\nNetwork Topology Summary:")
-        print(f"Total Departments: {len(self.departments)}")
-        print(f"Total Devices: {total_devices}")
-        print(f"Core Infrastructure: {len(self.core_infrastructure)} devices")
-        
-        print(f"\nGenerated Files:")
-        print(f"Output Directory: {self.output_dir}/")
-        print("  - ansible.cfg (Ansible configuration)")
-        print("  - inventories/hosts.yml (Device inventory)")
-        print("  - group_vars/ (Device group variables)")
-        print("  - roles/network-config/ (Network configuration role)")
-        print("  - site.yml (Complete deployment)")
-        print("  - README.md (Project documentation)")
-        
-        print(f"\nDeployment Instructions:")
-        print(f"1. Navigate to output directory: cd {self.output_dir}")
-        print(f"2. Deploy complete network: ansible-playbook site.yml")
-        print(f"3. Deploy network infrastructure only: ansible-playbook playbooks/deploy_network.yml")
-        
         return True
 
-    def test_gns3_connection(self):
-        """
-        Simple GNS3 connection test without importing diagnostic module
-        """
-        print("Testing GNS3 server connection...")
-        
+    def validate_subnet(self, subnet_str):
+        """Validate subnet format and uniqueness"""
         try:
-            import requests
-            
-            # Test basic connection
-            response = requests.get(f"{self.gns3_server_url}/v3/version", timeout=5)
-            
-            if response.status_code == 200:
-                version_info = response.json()
-                print(f" GNS3 server connection: OK")
-                print(f"  Version: {version_info.get('version', 'Unknown')}")
-                return True
-            else:
-                print(f" GNS3 server responded with status: {response.status_code}")
+            subnet = ipaddress.IPv4Network(subnet_str, strict=False)
+            if str(subnet) in self.used_subnets:
+                self.print_colored(f"Subnet {subnet} is already used. Please choose another.", 'red')
                 return False
+            return True
+        except ipaddress.AddressValueError:
+            self.print_colored("Invalid subnet format. Use format like 192.168.10.0/24", 'red')
+            return False
+
+    def generate_ip_addresses(self, subnet_str, device_names, device_types):
+        """
+        Generate IP addresses for devices in a subnet
+        Uses intelligent IP assignment based on device types
+        """
+        subnet = ipaddress.IPv4Network(subnet_str, strict=False)
+        gateway_ip = str(subnet.network_address + 1)
+        
+        ip_assignments = {}
+        ip_counter = 1
+        
+        # Assign IPs based on device type priority
+        # Gateways: .1, Switches: .250+, Routers: gateway, PCs: .10+, Servers: .100+, Printers: .200+
+        
+        for i, (device_name, device_type) in enumerate(zip(device_names, device_types)):
+            if device_type == 'router':
+                # Routers typically get the gateway IP
+                ip_assignments[device_name] = gateway_ip
+            elif device_type == 'switch':
+                # Switches get high IPs (.250, .251, etc.)
+                ip_assignments[device_name] = str(subnet.network_address + 250 + i)
+            elif device_type == 'server':
+                # Servers get .100+ range
+                ip_assignments[device_name] = str(subnet.network_address + 100 + i)
+            elif device_type == 'printer':
+                # Printers get .200+ range  
+                ip_assignments[device_name] = str(subnet.network_address + 200 + i)
+            else:  # PCs and other devices
+                # PCs get .10+ range
+                ip_assignments[device_name] = str(subnet.network_address + 10 + i)
+        
+        return ip_assignments, gateway_ip
+
+    def display_device_types(self):
+        """Display available device types"""
+        self.print_colored("\nAvailable Device Types:", 'cyan')
+        for key, device_type in self.device_types.items():
+            self.print_colored(f"  {key}. {device_type.capitalize()}", 'yellow')
+
+    def create_department(self, dept_number):
+        """Create a single department interactively"""
+        self.print_section(f"Department {dept_number} Configuration")
+        
+        # Department name
+        dept_name = self.get_user_input(
+            "Enter department name (e.g., Development, Sales, IT)",
+            validation=lambda x: len(x) >= 2
+        )
+        
+        # VLAN ID
+        vlan_id = self.get_user_input(
+            f"Enter VLAN ID for {dept_name} (1-4094)",
+            input_type='int',
+            validation=self.validate_vlan_id
+        )
+        self.used_vlans.add(vlan_id)
+        
+        # Subnet
+        default_subnet = f"192.168.{vlan_id}.0/24"
+        subnet = self.get_user_input(
+            f"Enter subnet for {dept_name}",
+            validation=self.validate_subnet,
+            default=default_subnet
+        )
+        self.used_subnets.add(subnet)
+        
+        # Calculate gateway
+        subnet_obj = ipaddress.IPv4Network(subnet, strict=False)
+        gateway = str(subnet_obj.network_address + 1)
+        
+        # Device configuration
+        self.print_colored(f"\nConfiguring devices for {dept_name}:", 'green')
+        devices = []
+        device_names = []
+        device_types = []
+        
+        # Ask for each device type
+        for device_type in ['switch', 'router', 'pc', 'server', 'printer']:
+            count = self.get_user_input(
+                f"How many {device_type}s in {dept_name}",
+                input_type='int',
+                validation=lambda x: x >= 0,
+                default='0' if device_type in ['server', 'printer'] else '1'
+            )
+            
+            # Create devices of this type
+            for i in range(count):
+                if device_type == 'switch':
+                    device_name = f"SW-{vlan_id}-{chr(65 + i)}"  # SW-10-A, SW-10-B, etc.
+                elif device_type == 'router':
+                    device_name = f"R-{vlan_id}-{chr(65 + i)}"   # R-10-A, R-10-B, etc.
+                elif device_type == 'pc':
+                    device_name = f"PC-{i+1}-{vlan_id}"         # PC-1-10, PC-2-10, etc.
+                elif device_type == 'server':
+                    device_name = f"server-{i+1}-{vlan_id}"     # server-1-10, etc.
+                elif device_type == 'printer':
+                    device_name = f"printer-{i+1}-{vlan_id}"   # printer-1-10, etc.
                 
-        except requests.exceptions.ConnectionError:
-            print(" Cannot connect to GNS3 server")
-            print("  Make sure GNS3 is running on http://127.0.0.1:3080")
-            return False
+                device_names.append(device_name)
+                device_types.append(device_type)
+        
+        # Generate IP addresses
+        if device_names:
+            ip_assignments, gateway_ip = self.generate_ip_addresses(subnet, device_names, device_types)
+            
+            # Create device entries
+            for device_name, device_type in zip(device_names, device_types):
+                devices.append({
+                    'name': device_name,
+                    'type': device_type,
+                    'ip': ip_assignments[device_name]
+                })
+            
+            # Update gateway if router exists
+            for device in devices:
+                if device['type'] == 'router':
+                    gateway = device['ip']
+                    break
+        
+        # Create department entry
+        department = {
+            'name': dept_name,
+            'vlan': vlan_id,
+            'subnet': subnet,
+            'gateway': gateway,
+            'devices': devices
+        }
+        
+        # Display summary
+        self.print_colored(f"\n✓ Department {dept_name} created:", 'green')
+        self.print_colored(f"  VLAN: {vlan_id}", 'yellow')
+        self.print_colored(f"  Subnet: {subnet}", 'yellow')
+        self.print_colored(f"  Gateway: {gateway}", 'yellow')
+        self.print_colored(f"  Devices: {len(devices)}", 'yellow')
+        
+        return department
+
+    def create_core_infrastructure(self):
+        """Create core infrastructure interactively"""
+        self.print_section("Core Infrastructure Configuration")
+        
+        create_core = self.get_user_input(
+            "Create core infrastructure? (y/n)",
+            default='y'
+        ).lower() == 'y'
+        
+        if not create_core:
+            return []
+        
+        core_devices = []
+        
+        # Core switch
+        core_switch_name = self.get_user_input(
+            "Enter core switch name",
+            default="CoreSwitch"
+        )
+        
+        core_switch_ip = self.get_user_input(
+            "Enter core switch IP address",
+            default="192.168.1.1"
+        )
+        
+        core_devices.append({
+            'name': core_switch_name,
+            'type': 'switch',
+            'ip': core_switch_ip
+        })
+        
+        # Additional core devices
+        while True:
+            add_more = self.get_user_input(
+                "Add another core device? (y/n)",
+                default='n'
+            ).lower() == 'y'
+            
+            if not add_more:
+                break
+            
+            self.display_device_types()
+            device_type_choice = self.get_user_input(
+                "Select device type (1-5)",
+                validation=lambda x: x in self.device_types.keys()
+            )
+            
+            device_type = self.device_types[device_type_choice]
+            device_name = self.get_user_input(f"Enter {device_type} name")
+            device_ip = self.get_user_input(f"Enter {device_type} IP address")
+            
+            core_devices.append({
+                'name': device_name,
+                'type': device_type,
+                'ip': device_ip
+            })
+        
+        self.print_colored(f"\n✓ Created {len(core_devices)} core infrastructure devices", 'green')
+        return core_devices
+
+    def display_network_summary(self):
+        """Display a summary of the created network"""
+        self.print_header("NETWORK TOPOLOGY SUMMARY")
+        
+        total_devices = sum(len(dept['devices']) for dept in self.network_data['departments'])
+        total_devices += len(self.network_data['core_infrastructure'])
+        
+        self.print_colored(f"Total Departments: {len(self.network_data['departments'])}", 'cyan')
+        self.print_colored(f"Total Devices: {total_devices}", 'cyan')
+        self.print_colored(f"Core Infrastructure: {len(self.network_data['core_infrastructure'])}", 'cyan')
+        
+        # Department details
+        for dept in self.network_data['departments']:
+            self.print_colored(f"\n{dept['name']} (VLAN {dept['vlan']}):", 'green')
+            self.print_colored(f"  Subnet: {dept['subnet']}", 'yellow')
+            self.print_colored(f"  Gateway: {dept['gateway']}", 'yellow')
+            self.print_colored(f"  Devices: {len(dept['devices'])}", 'yellow')
+            
+            # Device breakdown
+            device_counts = {}
+            for device in dept['devices']:
+                device_type = device['type']
+                device_counts[device_type] = device_counts.get(device_type, 0) + 1
+            
+            for device_type, count in device_counts.items():
+                self.print_colored(f"    {device_type.capitalize()}s: {count}", 'cyan')
+
+    def save_network_data(self, filename='network_data.yml'):
+        """Save the network data to YAML file"""
+        try:
+            with open(filename, 'w') as f:
+                yaml.dump(self.network_data, f, default_flow_style=False, indent=2, sort_keys=False)
+            
+            self.print_colored(f"\n✓ Network data saved to {filename}", 'green')
+            return True
         except Exception as e:
-            print(f" Connection test failed: {e}")
+            self.print_colored(f"✗ Error saving network data: {e}", 'red')
             return False
 
-    # Initialize GNS3 settings
-    gns3_server_url = "http://127.0.0.1:3080"
+    def load_template_network(self):
+        """Create a template network for quick start"""
+        self.print_colored("Creating template network with 3 departments...", 'yellow')
+        
+        # Template departments
+        template_departments = [
+            {
+                'name': 'Development',
+                'vlan': 10,
+                'base_ip': '192.168.10.0/24',
+                'devices': {'switch': 1, 'router': 1, 'pc': 3, 'server': 1, 'printer': 1}
+            },
+            {
+                'name': 'Sales', 
+                'vlan': 20,
+                'base_ip': '192.168.20.0/24',
+                'devices': {'switch': 1, 'router': 1, 'pc': 5, 'server': 0, 'printer': 1}
+            },
+            {
+                'name': 'IT',
+                'vlan': 30,
+                'base_ip': '192.168.30.0/24', 
+                'devices': {'switch': 1, 'router': 1, 'pc': 2, 'server': 2, 'printer': 1}
+            }
+        ]
+        
+        for template in template_departments:
+            devices = []
+            device_names = []
+            device_types = []
+            
+            # Create devices based on template
+            for device_type, count in template['devices'].items():
+                for i in range(count):
+                    if device_type == 'switch':
+                        device_name = f"SW-{template['vlan']}-{chr(65 + i)}"
+                    elif device_type == 'router':
+                        device_name = f"R-{template['vlan']}-{chr(65 + i)}"
+                    elif device_type == 'pc':
+                        device_name = f"PC-{i+1}-{template['vlan']}"
+                    elif device_type == 'server':
+                        device_name = f"server-{i+1}-{template['vlan']}"
+                    elif device_type == 'printer':
+                        device_name = f"printer-{i+1}-{template['vlan']}"
+                    
+                    device_names.append(device_name)
+                    device_types.append(device_type)
+            
+            # Generate IPs
+            ip_assignments, gateway_ip = self.generate_ip_addresses(
+                template['base_ip'], device_names, device_types
+            )
+            
+            # Create device entries
+            for device_name, device_type in zip(device_names, device_types):
+                devices.append({
+                    'name': device_name,
+                    'type': device_type,
+                    'ip': ip_assignments[device_name]
+                })
+            
+            # Update gateway for router
+            gateway = gateway_ip
+            for device in devices:
+                if device['type'] == 'router':
+                    gateway = device['ip']
+                    break
+            
+            # Add department
+            self.network_data['departments'].append({
+                'name': template['name'],
+                'vlan': template['vlan'],
+                'subnet': template['base_ip'],
+                'gateway': gateway,
+                'devices': devices
+            })
+            
+            self.used_vlans.add(template['vlan'])
+            self.used_subnets.add(template['base_ip'])
+        
+        # Add core infrastructure
+        self.network_data['core_infrastructure'] = [{
+            'name': 'CoreSwitch',
+            'type': 'switch', 
+            'ip': '192.168.1.1'
+        }]
+        
+        self.print_colored("✓ Template network created successfully!", 'green')
 
+    def run_ansible_generator(self):
+        """Run the existing Ansible generator after creating network_data.yml"""
+        self.print_section("Ansible Configuration Generation")
+        
+        run_ansible = self.get_user_input(
+            "Generate Ansible configuration now? (y/n)",
+            default='y'
+        ).lower() == 'y'
+        
+        if not run_ansible:
+            self.print_colored("Skipping Ansible generation. You can run it later.", 'yellow')
+            return
+        
+        # Check if generator exists
+        generators = ['generatorv3.py', 'generatorv2.py', 'generatorv1.py']
+        generator_found = None
+        
+        for gen in generators:
+            if os.path.exists(gen):
+                generator_found = gen
+                break
+        
+        if generator_found:
+            self.print_colored(f"Found {generator_found}. Running Ansible generator...", 'green')
+            try:
+                os.system(f"python3 {generator_found}")
+                self.print_colored("✓ Ansible configuration generated!", 'green')
+            except Exception as e:
+                self.print_colored(f"✗ Error running generator: {e}", 'red')
+        else:
+            self.print_colored("No generator found. Please run manually later.", 'yellow')
+            self.print_colored("Available generators: generatorv1.py, generatorv2.py, generatorv3.py", 'cyan')
+
+    def main_menu(self):
+        """Main interactive menu"""
+        self.print_header("INTERACTIVE NETWORK DATA GENERATOR V2")
+        self.print_colored("Create custom network topologies interactively!", 'cyan')
+        
+        while True:
+            self.print_section("Main Menu")
+            self.print_colored("1. Create Custom Network (Interactive)", 'yellow')
+            self.print_colored("2. Load Template Network (Quick Start)", 'yellow')
+            self.print_colored("3. View Current Network Summary", 'yellow')
+            self.print_colored("4. Save Network Data", 'yellow')
+            self.print_colored("5. Generate Ansible Configuration", 'yellow')
+            self.print_colored("6. Exit", 'yellow')
+            
+            choice = self.get_user_input("Select option (1-6)")
+            
+            if choice == '1':
+                self.create_interactive_network()
+            elif choice == '2':
+                self.load_template_network()
+            elif choice == '3':
+                if self.network_data['departments'] or self.network_data['core_infrastructure']:
+                    self.display_network_summary()
+                else:
+                    self.print_colored("No network data available. Create a network first.", 'red')
+            elif choice == '4':
+                if self.network_data['departments'] or self.network_data['core_infrastructure']:
+                    filename = self.get_user_input("Enter filename", default="network_data.yml")
+                    self.save_network_data(filename)
+                else:
+                    self.print_colored("No network data to save. Create a network first.", 'red')
+            elif choice == '5':
+                if self.network_data['departments'] or self.network_data['core_infrastructure']:
+                    # Save first, then run generator
+                    self.save_network_data()
+                    self.run_ansible_generator()
+                else:
+                    self.print_colored("No network data available. Create a network first.", 'red')
+            elif choice == '6':
+                self.print_colored("Thank you for using Interactive Network Generator V2!", 'green')
+                break
+            else:
+                self.print_colored("Invalid choice. Please select 1-6.", 'red')
+
+    def create_interactive_network(self):
+        """Create network interactively"""
+        self.print_header("INTERACTIVE NETWORK CREATION")
+        
+        # Clear existing data if user wants
+        if self.network_data['departments'] or self.network_data['core_infrastructure']:
+            clear_data = self.get_user_input(
+                "Clear existing network data? (y/n)",
+                default='n'
+            ).lower() == 'y'
+            
+            if clear_data:
+                self.network_data = {'departments': [], 'core_infrastructure': []}
+                self.used_vlans.clear()
+                self.used_subnets.clear()
+                self.print_colored("✓ Existing data cleared.", 'green')
+        
+        # Number of departments
+        num_departments = self.get_user_input(
+            "How many departments do you want to create",
+            input_type='int',
+            validation=lambda x: x > 0 and x <= 20
+        )
+        
+        # Create departments
+        for i in range(num_departments):
+            department = self.create_department(i + 1)
+            self.network_data['departments'].append(department)
+        
+        # Core infrastructure
+        core_infrastructure = self.create_core_infrastructure()
+        self.network_data['core_infrastructure'] = core_infrastructure
+        
+        # Display summary
+        self.display_network_summary()
+        
+        # Auto-save
+        auto_save = self.get_user_input(
+            "Save network data automatically? (y/n)",
+            default='y'
+        ).lower() == 'y'
+        
+        if auto_save:
+            self.save_network_data()
 
 def main():
-    """
-    FIXED Main function with proper menu handling
-    """
-    print("Starting Network Automation Generator - CORRECTED VERSION...")
-    print("=" * 60)
-    
-    # Initialize generator
-    generator = NetworkAutomationGenerator()
-    generator.load_network_data()
-    
-    # Check if network data loaded successfully
-    if not generator.departments:
-        print("ERROR: No departments loaded from network_data.yml")
-        print("Please check your network configuration file")
-        exit(1)
-    
-    print(f" Loaded {len(generator.departments)} departments")
-    print(f" Loaded {len(generator.core_infrastructure)} core infrastructure devices")
-    
-    # FIXED MAIN MENU - All choices now handled properly
-    print("\nWhat would you like to generate?")
-    print("1. Ansible Configuration")
-    print("2. GNS3 Connection Test")
-    print("3. Both Ansible + GNS3 Test")
-    print("4. Exit")
-    
+    """Main function"""
     try:
-        choice = input("\nEnter choice (1-4): ").strip()
+        generator = InteractiveNetworkGenerator()
+        generator.main_menu()
     except KeyboardInterrupt:
-        print("\nOperation cancelled.")
-        exit(0)
-    
-    success = False
-    
-    if choice == "1":
-        # ANSIBLE GENERATION ONLY
-        print("\nGenerating Ansible configuration...")
-        success = generator.run_generation()
-        
-        if success:
-            print("\n Ansible automation files generated successfully!")
-            print(" All YAML files use correct dictionary format")
-            print(" All IP addresses taken directly from network_data.yml")
-            print(" No external template files needed")
-        else:
-            print("\n Ansible generation failed!")
-    
-    elif choice == "2":
-        # GNS3 CONNECTION TEST
-        print("\nTesting GNS3 connection...")
-        success = generator.test_gns3_connection()
-        
-        if success:
-            print("\n GNS3 connection test successful!")
-        else:
-            print("\n GNS3 connection test failed!")
-    
-    elif choice == "3":
-        # BOTH ANSIBLE AND GNS3 TEST
-        print("\nGenerating Ansible configuration and testing GNS3...")
-        
-        # First generate Ansible config
-        print("\nStep 1: Generating Ansible configuration...")
-        ansible_success = generator.run_generation()
-        
-        # Then test GNS3 connection
-        print("\nStep 2: Testing GNS3 connection...")
-        gns3_success = generator.test_gns3_connection()
-        
-        success = ansible_success and gns3_success
-        
-        if success:
-            print("\n Complete automation setup successful!")
-            print(" Ansible playbooks ready for deployment")
-            print(" GNS3 server connection verified")
-        else:
-            print(f"\n Partial success:")
-            print(f"  Ansible: {' Success' if ansible_success else ' Failed'}")
-            print(f"  GNS3: {' Success' if gns3_success else ' Failed'}")
-    
-    elif choice == "4":
-        print("Exiting...")
-        exit(0)
-    
-    else:
-        print("Invalid choice. Please run again and select 1-4.")
-        exit(1)
-    
-    # Final result
-    if success:
-        print("\n" + "=" * 60)
-        print("GENERATION COMPLETED SUCCESSFULLY!")
-        print("=" * 60)
-    else:
-        print("\n" + "=" * 60)
-        print("GENERATION COMPLETED WITH ISSUES!")
-        print("=" * 60)
-
+        print("\n\nOperation cancelled by user. Goodbye!")
+    except Exception as e:
+        print(f"\nUnexpected error: {e}")
+        print("Please report this issue.")
 
 if __name__ == "__main__":
     main()
