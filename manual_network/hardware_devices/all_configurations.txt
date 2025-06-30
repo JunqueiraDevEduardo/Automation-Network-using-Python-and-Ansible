@@ -663,7 +663,7 @@ enable
 configure terminal
 hostname Server-1-100
 interface f0/0
-ip address 192.168.0.2 255.255.255.240
+ip address 192.168.0.12 255.255.255.240
 no shutdown
 exit
 ip default-gateway 192.168.0.1
@@ -672,7 +672,7 @@ enable
 configure terminal
 hostname Server-2-100
 interface f0/0
-ip address 192.168.0.3 255.255.255.240
+ip address 192.168.0.13 255.255.255.240
 no shutdown
 exit
 ip default-gateway 192.168.0.1
@@ -681,7 +681,7 @@ enable
 configure terminal
 hostname Server-3-100
 interface f0/0
-ip address 192.168.0.4 255.255.255.240
+ip address 192.168.0.14 255.255.255.240
 no shutdown
 exit
 ip default-gateway 192.168.0.1
@@ -690,7 +690,7 @@ enable
 configure terminal
 hostname Server-4-100
 interface f0/0
-ip address 192.168.0.5 255.255.255.240
+ip address 192.168.0.15 255.255.255.240
 no shutdown
 exit
 ip default-gateway 192.168.0.1
@@ -699,7 +699,7 @@ enable
 configure terminal
 hostname Server-5-100
 interface f0/0
-ip address 192.168.0.6 255.255.255.240
+ip address 192.168.0.16 255.255.255.240
 no shutdown
 exit
 ip default-gateway 192.168.0.1
@@ -708,7 +708,7 @@ enable
 configure terminal
 hostname Server-6-100
 interface f0/0
-ip address 192.168.0.7 255.255.255.240
+ip address 192.168.0.17 255.255.255.240
 no shutdown
 exit
 ip default-gateway 192.168.0.1

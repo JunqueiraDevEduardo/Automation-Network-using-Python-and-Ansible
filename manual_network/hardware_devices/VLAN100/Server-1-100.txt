@@ -2,7 +2,7 @@ enable
 configure terminal
 hostname Server-1-100
 interface f0/0
-ip address 192.168.0.2 255.255.255.240
+ip address 192.168.0.12 255.255.255.240
 no shutdown
 exit
 ip default-gateway 192.168.0.1

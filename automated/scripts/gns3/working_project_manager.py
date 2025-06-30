@@ -17,7 +17,7 @@ def load_network_config():
     Load network configuration from YAML file.
     Returns the parsed configuration or None if file not found.
     """
-    config_file = "../../config/network_data.yml"
+    config_file = "testv1/network_data.yml"
     try:
         with open(config_file, 'r') as f:
             return yaml.safe_load(f)

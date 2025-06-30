@@ -5,8 +5,8 @@ This project demonstrates automated network deployment using Python and Ansible.
 
 ## Network Statistics
 - **Total Departments:** 10
-- **Total Network Devices:** 65
-- **Department Devices:** 64
+- **Total Network Devices:** 66
+- **Department Devices:** 65
 - **Core Infrastructure:** 1 devices
 - **VLANs Configured:** 10
 
@@ -17,7 +17,7 @@ This project demonstrates automated network deployment using Python and Ansible.
 #### Development/Engineering (VLAN 10)
 - **Subnet:** 192.168.10.0/28
 - **Gateway:** 192.168.10.1
-- **Total Devices:** 8
+- **Total Devices:** 9
 
 **Device Details:**
   - `SW-10-A` (switch): 192.168.10.250
@@ -26,8 +26,9 @@ This project demonstrates automated network deployment using Python and Ansible.
   - `PC-3-10` (pc): 192.168.10.4
   - `PC-4-10` (pc): 192.168.10.5
   - `PC-5-10` (pc): 192.168.10.6
+  - `PC-6-10` (pc): 192.168.10.7
   - `R-10-A` (router): 192.168.10.1
-  - `Server-1-10` (server): 192.168.10.7
+  - `Server-1-10` (server): 192.168.10.8
 
 #### Guest Network (VLAN 20)
 - **Subnet:** 192.168.20.0/28
@@ -135,18 +136,18 @@ This project demonstrates automated network deployment using Python and Ansible.
 - **Total Devices:** 12
 
 **Device Details:**
-  - `SW-100-G` (switch): 192.168.0.250
+  - `SW-100-G` (switch): 192.168.2.250
   - `PC-1-100` (pc): 192.168.0.8
   - `PC-2-100` (pc): 192.168.0.9
   - `PC-3-100` (pc): 192.168.0.10
   - `PC-4-100` (pc): 192.168.0.11
   - `R-100-G` (router): 192.168.0.1
-  - `Server-1-100` (server): 192.168.0.2
-  - `Server-2-100` (server): 192.168.0.3
-  - `Server-3-100` (server): 192.168.0.4
-  - `Server-4-100` (server): 192.168.0.5
-  - `Server-5-100` (server): 192.168.0.6
-  - `Server-6-100` (server): 192.168.0.7
+  - `Server-1-100` (switch): 192.168.0.12
+  - `Server-2-100` (switch): 192.168.0.13
+  - `Server-3-100` (switch): 192.168.0.14
+  - `Server-4-100` (switch): 192.168.0.15
+  - `Server-5-100` (switch): 192.168.0.16
+  - `Server-6-100` (switch): 192.168.0.17
 
 ### Core Infrastructure
 - `CoreSwitch` (switch): 192.168.1.1
