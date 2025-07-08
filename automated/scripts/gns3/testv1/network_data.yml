@@ -1,7 +1,8 @@
 
-# Network configuration data - all manual configuration here!
+# Network configuration data - all manual configuration here, file manual network data execel!
 departments:
 
+#First department A: 
 - name: Development/Engineering
   vlan: 10
   subnet: 192.168.10.0/28
@@ -39,6 +40,7 @@ departments:
     name: Server-1-10
     ip: 192.168.10.8
 
+#Second Department D:
 - name: Guest Network
   vlan: 20
   subnet: 192.168.20.0/28
@@ -68,7 +70,7 @@ departments:
   - type: router
     name: R-20-D
     ip: 192.168.20.1
-
+#Third Department B:
 - name: IT
   vlan: 30
   subnet: 192.168.30.0/28
@@ -106,6 +108,7 @@ departments:
     name: Server-1-30
     ip: 192.168.30.8
 
+#Forth Department C:
 - name: Sales and Marketing
   vlan: 40
   subnet: 192.168.40.0/29
@@ -134,6 +137,7 @@ departments:
     name: R-40-C
     ip: 192.168.40.1
 
+#Fifth department H:
 - name: Admin Department
   vlan: 50
   subnet: 192.168.50.0/29
@@ -155,6 +159,7 @@ departments:
     name: R-50-H
     ip: 192.168.50.1
 
+#Sixth Department E:
 - name: Human Resource Management
   vlan: 60
   subnet: 192.168.60.0/29
@@ -180,6 +185,7 @@ departments:
     name: R-60-E
     ip: 192.168.60.1
 
+#Seventh Department E:
 - name: Accounts and Finance
   vlan: 70
   subnet: 192.168.70.0/29
@@ -205,6 +211,7 @@ departments:
     name: R-70-E
     ip: 192.168.70.1
 
+#Eigth department J:
 - name: Design
   vlan: 80
   subnet: 192.168.80.0/29
@@ -226,6 +233,7 @@ departments:
     name: R-80-J
     ip: 192.168.80.1
 
+#ninth department I:
 - name: Marketing
   vlan: 90
   subnet: 192.168.90.0/29
@@ -247,6 +255,7 @@ departments:
     name: R-90-I
     ip: 192.168.90.1
 
+#tenth department G:
 - name: Infrastructure & Security
   vlan: 100
   subnet: 192.168.0.0/23
@@ -292,6 +301,7 @@ departments:
     name: Server-6-100
     ip: 192.168.0.17
 
+#Switch core outside there is no department:
 core_infrastructure:
   - type: switch
     name: CoreSwitch

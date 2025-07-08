@@ -1,5 +1,5 @@
 ---
-# End Devices Configuration Tasks
+# End Devices Configuration Tasks for PCs, servers, and printers only!
 
 # Configure network interface using netplan
 - name: Configure network interface using netplan

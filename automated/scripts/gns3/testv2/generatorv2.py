@@ -1,8 +1,7 @@
 """
-Simplified Network Data Generator V2 - 100% Automatic
-Eduardo Junqueira IPVC-ESTG ERSC
-
-Ultra-simplified network topology generator without limitations
+Project 2 Eduardo Junqueira IPVC-ESTG ERSC
+Network Automation Generator V2
+simplified network topology generator without limitations generate thr network_data_new.yml
 Features:
 - Create, edit, delete departments and devices without restrictions
 - 100% automatic operation with minimal user input

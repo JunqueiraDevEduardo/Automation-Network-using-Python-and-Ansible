@@ -1,28 +1,30 @@
 """
 Project 2 Eduardo Junqueira IPVC-ESTG ERSC
-Network Automation Generator V2
+Network Automation Generator V1
 Reads network_data.yml and generates complete Ansible automation structure
-Creates proper inventory, playbooks, roles, and configuration files
+Creates proper inventory, playbooks, roles, and configuration files in ansibleconfiguration path!
 """
 
-import yaml
-import os
-from pathlib import Path
+import yaml #librarie to read files yml that need the python3 -m pip install pyyaml command
+import os #provides functions for interacting with the operating system.
+from pathlib import Path #call path() directly without having the prefix pathlib.
 
+#Main class generator automated network
 class NetworkAutomationGenerator:
     """
-    Main generator class that converts network_data.yml into complete Ansible automation
-    Creates proper directory structure, inventory, playbooks, and configuration files
-    All templates embedded in code - no external template files needed
+    Main generator class that converts network_data.yml into complete Ansible automation:
+    ->Creates proper directory structure, inventory, playbooks, and configuration files
     """
+    #####################################################################################################
+    #####################################################################################################
     def __init__(self, network_data_file: str = "network_data.yml"):
         """
-        Initialize Network Automation Generator
+        Reads Network Automation from network_data.yml 
         """
         
         # File and directory configuration
         self.network_data_file = network_data_file
-        self.output_dir = "ansibleconf"
+        self.output_dir = "ansiblegeneratedv1"
         
         # Data containers - populated when loading YAML configuration
         self.network_data = None
@@ -38,11 +40,13 @@ class NetworkAutomationGenerator:
             'server': 'servers',
             'printer': 'printers'
         }
-
+    #####################################################################################################
+    #####################################################################################################
     def load_network_data(self):
         """
-        Load network configuration from YAML file.
+        Load and verification  YAML file network_data.yml, if don't exist don't work the script!
         """
+        #verification
         try:
             # Check if configuration file exists
             if not os.path.exists(self.network_data_file):
@@ -76,10 +80,11 @@ class NetworkAutomationGenerator:
             print(f"File loading error: {e}")
             return False
 
+    #####################################################################################################
+    #####################################################################################################
     def create_directory_structure(self):
         """
-        Create folders for network automation files.
-        FIXED: Now creates all required directories including group_vars
+        Create folders for network automation files version 1.
         """
         
         # Main folder - holds all automation files
@@ -91,13 +96,13 @@ class NetworkAutomationGenerator:
         # Playbooks folder - automation scripts
         Path(self.output_dir + "/playbooks").mkdir(exist_ok=True)
         
-        # FIXED: Create group_vars directory
-        Path(self.output_dir + "/group_vars").mkdir(exist_ok=True)
+        #  Create departments directory
+        Path(self.output_dir + "/departments").mkdir(exist_ok=True)
         
         # Tasks folder - Cisco commands for switch and router configuration
         Path(self.output_dir + "/roles/network-config/tasks").mkdir(parents=True, exist_ok=True)
         
-        # Variables folder - VLAN numbers and IP address ranges
+        # Variables folder department - VLAN numbers and IP address ranges
         Path(self.output_dir + "/roles/network-config/vars").mkdir(exist_ok=True)
         
         # Handlers folder - for service restarts
@@ -105,11 +110,14 @@ class NetworkAutomationGenerator:
         
         print(f"Created network automation folders in {self.output_dir}")
 
+    #####################################################################################################
+    #####################################################################################################
     def generate_ansible_cfg(self):
         """
         Generate ansible.cfg file with network device settings.
+        Ansible's main configuration file, used to customize how Ansible behaves.
         """
-        
+        #write in file ansible.cfg 
         config_content = """[defaults]
 # Basic Ansible settings for network automation
 inventory = inventories/hosts.yml
@@ -139,18 +147,21 @@ become_user = admin
 become_ask_pass = False
 """
         
-        # Write configuration file to output directory
+        # Write configuration  above in file to output directory
         with open(f"{self.output_dir}/ansible.cfg", 'w') as f:
             f.write(config_content)
         
         print("Generated ansible.cfg for network device automation")
-
+     #####################################################################################################
+    #####################################################################################################
     def generate_inventory(self):
         """
         Generate Ansible inventory from network_data.yml
-        Uses only real values from network configuration
+        Uses only real values from  network_data.yml network configuration
+        Generathe the /inventories/hosts.yml
         """
-        # Initialize basic inventory structure with device type groups
+        # Initialize basic inventory structure with device type groups all hardware devices are hosts!
+        #Strcuture overal devices hardware network
         inventory = {
             'all': {
                 'children': {
@@ -164,7 +175,7 @@ become_ask_pass = False
             }
         }
         
-        # Process core infrastructure devices
+        # Process core infrastructure devices the core device is also a host
         for device in self.core_infrastructure:
             device_name = device['name']
             device_info = {
@@ -182,6 +193,7 @@ become_ask_pass = False
             gateway = dept['gateway']
             devices = dept.get('devices', [])
             
+            #####################################################################################################
             # Create department-specific group
             dept_group_name = f"dept_{vlan_id}"
             inventory['all']['children'][dept_group_name] = {
@@ -193,7 +205,7 @@ become_ask_pass = False
                     'gateway': gateway
                 }
             }
-            
+            #####################################################################################################
             # Process each device in the department
             for device in devices:
                 device_name = device['name']
@@ -209,7 +221,7 @@ become_ask_pass = False
                     'subnet': subnet,
                     'gateway': gateway
                 }
-                
+                #####################################################################################################
                 # Add connection settings based on device type
                 if device_type in ['switch', 'router']:
                     device_info.update({
@@ -228,6 +240,7 @@ become_ask_pass = False
                         'ansible_become_method': 'sudo'
                     })
                 
+                #####################################################################################################
                 # Place device in correct group
                 if device_type in self.device_type_mapping:
                     group_name = self.device_type_mapping[device_type]
@@ -241,18 +254,20 @@ become_ask_pass = False
         # Save inventory file
         with open(f"{self.output_dir}/inventories/hosts.yml", 'w') as f:
             yaml.dump(inventory, f, default_flow_style=False, indent=2, sort_keys=False)
-        
+        #####################################################################################################
+
         # Count total devices for confirmation
         total_devices = sum(len(group['hosts']) for group in inventory['all']['children'].values())
         print(f"Generated inventory: {total_devices} devices in {self.output_dir}/inventories/hosts.yml")
 
+     #####################################################################################################
+    #####################################################################################################
     def generate_group_department(self):
         """
-        Generate group variables for device types and departments
-        FIXED: Now writes to the correct group_vars directory
+        Generate group variables for device types and departments in departments path
         """
-        
-        # Variables for switches group
+         #####################################################################################################
+        # Variables for switches group yaml 
         switches_vars = {
             'ansible_network_os': 'ios',
             'ansible_connection': 'network_cli',
@@ -264,9 +279,10 @@ become_ask_pass = False
             'domain_name': 'company.local'
         }
         
-        with open(f"{self.output_dir}/group_vars/switches.yml", 'w') as f:
+        with open(f"{self.output_dir}/departments/switches.yml", 'w') as f:
             yaml.dump(switches_vars, f, default_flow_style=False, indent=2)
         
+        #####################################################################################################
         # Variables for routers group
         routers_vars = {
             'ansible_network_os': 'ios',
@@ -279,10 +295,11 @@ become_ask_pass = False
             'domain_name': 'company.local'
         }
         
-        with open(f"{self.output_dir}/group_vars/routers.yml", 'w') as f:
+        with open(f"{self.output_dir}/departments/routers.yml", 'w') as f:
             yaml.dump(routers_vars, f, default_flow_style=False, indent=2)
         
-        # Variables for PCs group
+        #####################################################################################################
+        # Variables for PCs group yaml
         pcs_vars = {
             'ansible_connection': 'ssh',
             'ansible_user': 'admin',
@@ -292,10 +309,11 @@ become_ask_pass = False
             'domain_name': 'company.local'
         }
         
-        with open(f"{self.output_dir}/group_vars/pcs.yml", 'w') as f:
+        with open(f"{self.output_dir}/departments/pcs.yml", 'w') as f:
             yaml.dump(pcs_vars, f, default_flow_style=False, indent=2)
-        
-        # Variables for servers group
+
+        #####################################################################################################
+        # Variables for servers group yaml
         servers_vars = {
             'ansible_connection': 'ssh',
             'ansible_user': 'admin',
@@ -305,10 +323,11 @@ become_ask_pass = False
             'domain_name': 'company.local'
         }
         
-        with open(f"{self.output_dir}/group_vars/servers.yml", 'w') as f:
+        with open(f"{self.output_dir}/departments/servers.yml", 'w') as f:
             yaml.dump(servers_vars, f, default_flow_style=False, indent=2)
         
-        # Variables for printers group
+        #####################################################################################################
+        # Variables for printers group yaml
         printers_vars = {
             'ansible_connection': 'ssh',
             'ansible_user': 'admin',
@@ -318,10 +337,11 @@ become_ask_pass = False
             'domain_name': 'company.local'
         }
         
-        with open(f"{self.output_dir}/group_vars/printers.yml", 'w') as f:
+        with open(f"{self.output_dir}/departments/printers.yml", 'w') as f:
             yaml.dump(printers_vars, f, default_flow_style=False, indent=2)
-        
-        # Variables for core infrastructure
+
+        #####################################################################################################
+        # Variables for core infrastructure yaml
         core_vars = {
             'ansible_network_os': 'ios',
             'ansible_connection': 'network_cli',
@@ -333,10 +353,11 @@ become_ask_pass = False
             'domain_name': 'company.local'
         }
         
-        with open(f"{self.output_dir}/group_vars/core_infrastructure.yml", 'w') as f:
+        with open(f"{self.output_dir}/departments/core_infrastructure.yml", 'w') as f:
             yaml.dump(core_vars, f, default_flow_style=False, indent=2)
-        
-        # Generate department-specific group variables
+
+        #####################################################################################################
+        # Generate department-specific group variables 10-20-30-40-50-60-70-80-90-100
         for dept in self.departments:
             dept_name = dept['name']
             vlan_id = dept['vlan']
@@ -351,15 +372,17 @@ become_ask_pass = False
                 'vlan_name': dept_name.replace('/', '-').replace(' ', '-').replace('&', 'and')
             }
             
-            with open(f"{self.output_dir}/group_vars/dept_{vlan_id}.yml", 'w') as f:
+            with open(f"{self.output_dir}/departments/dept_{vlan_id}.yml", 'w') as f:
                 yaml.dump(dept_vars, f, default_flow_style=False, indent=2)
         
         print("Generated group variables for all device types and departments")
         print(f"Created {len(self.departments) + 6} group variable files")
 
+    #####################################################################################################
+    #####################################################################################################
     def generate_network_role(self):
         """
-        Generate complete network configuration role for switches and routers
+        Generate complete network configuration role for switches and routers only
         """
         
         network_tasks = """---
@@ -483,14 +506,15 @@ become_ask_pass = False
         
         print("Generated complete network configuration role for switches and routers")
         print(f"Created VLAN configurations for {len(self.departments)} departments")
-
+    #####################################################################################################
+    #####################################################################################################
     def generate_end_devices_role(self):
         """
-        Generate end devices configuration role for PCs, servers, and printers
+        Generate end devices configuration role for PCs, servers, and printers only
         """
         
         end_devices_tasks = """---
-# End Devices Configuration Tasks
+# End Devices Configuration Tasks for PCs, servers, and printers only!
 
 # Configure network interface using netplan
 - name: Configure network interface using netplan
@@ -565,7 +589,8 @@ become_ask_pass = False
         # Write tasks file
         with open(f"{self.output_dir}/roles/network-config/tasks/end_devices.yml", 'w') as f:
             f.write(end_devices_tasks)
-        
+
+        #####################################################################################################
         # Create handlers
         end_devices_handlers = """---
 # End Devices Configuration Handlers
@@ -585,6 +610,7 @@ become_ask_pass = False
         with open(f"{self.output_dir}/roles/network-config/handlers/main.yml", 'w') as f:
             f.write(end_devices_handlers)
         
+        #####################################################################################################
         # Define variables for end device configuration
         end_devices_vars = {
             'basic_packages': [
@@ -597,6 +623,7 @@ become_ask_pass = False
             'domain_name': 'company.local'
         }
         
+        #####################################################################################################
         # Read existing variables and merge
         vars_file = f"{self.output_dir}/roles/network-config/vars/main.yml"
         try:
@@ -612,15 +639,18 @@ become_ask_pass = False
             yaml.dump(existing_vars, f, default_flow_style=False, indent=2)
         
         print("Generated end devices configuration for PCs, servers, and printers")
-
+    #####################################################################################################
+    #####################################################################################################
     def generate_playbooks(self):
         """
-        Generate main playbooks for network deployment
+        Generate main playbooks for network deployment path playbooks
+        a structured file, written in YAML, that defines a series of automated tasks!
+        running modules (pre-built scripts) that handle specific task: configuring services for main and end_devices
         """
         
-        # Main site deployment playbook
-        site_playbook = """---
-# Main Site Deployment Playbook
+        # Main api deployment playbook
+        api_playbook = """---
+# Main API Deployment Playbook
 
 # Configure Network Infrastructure Devices
 - name: Configure Network Infrastructure Devices
@@ -648,9 +678,10 @@ become_ask_pass = False
   tags: [endpoints, end_devices, pcs, servers, printers]
 """
         
-        with open(f"{self.output_dir}/site.yml", 'w') as f:
-            f.write(site_playbook)
+        with open(f"{self.output_dir}/api.yml", 'w') as f:
+            f.write(api_playbook)
         
+        #####################################################################################################
         # Network devices only playbook
         network_playbook = f"""---
 # Network Infrastructure Only Playbook
@@ -698,16 +729,18 @@ become_ask_pass = False
         
         print("Generated complete set of playbooks")
         print(f"Configured {len(self.departments)} department VLANs using real data")
+    #####################################################################################################
+    #####################################################################################################
 
     def generate_network_documentation(self):
         """
-        Generate comprehensive network documentation
+        Generate comprehensive network documentation file README.md
         """
         
         total_dept_devices = sum(len(dept['devices']) for dept in self.departments)
         total_devices = total_dept_devices + len(self.core_infrastructure)
         
-        readme_content = f"""# University Network Automation Project
+        readme_content = f"""#Network Automation Project
 
 ## Project Overview
 This project demonstrates automated network deployment using Python and Ansible.
@@ -758,11 +791,11 @@ This project demonstrates automated network deployment using Python and Ansible.
             readme_content += f"- `{device_name}` ({device_type}): {device_ip}\n"
         
         readme_content += """
-## Usage Instructions
+## Usage Instructions future!
 
 ### Complete Network Deployment
 ```bash
-ansible-playbook site.yml
+ansible-playbook api.yml
 ```
 
 ### Network Infrastructure Only
@@ -773,30 +806,30 @@ ansible-playbook playbooks/deploy_network.yml
 ## Generated Files
 - `ansible.cfg` - Ansible configuration
 - `inventories/hosts.yml` - Device inventory
-- `group_vars/` - Device group variables
+- `departments/` - Device group departments
 - `roles/network-config/` - Network configuration role
-- `site.yml` - Complete deployment playbook
+- `api.yml` - Complete deployment playbook
 - `playbooks/deploy_network.yml` - Network infrastructure only
 """
         
-        # Write README file
+        # Write README file for  readme_content += """ 
         with open(f"{self.output_dir}/README.md", 'w') as f:
             f.write(readme_content)
         
-        print("Generated comprehensive project documentation")
+        print("Generated ansible documentation overview ")
 
+    #####################################################################################################
+    #####################################################################################################
     def run_generation(self):
         """
-        Main execution method - FIXED VERSION
+        Main execution method generator implementation of all functions above!
         """
-        
-        print("Network Automation Generator for University Project")
-        print("Manual to Automated Network Deployment Transformation")
+
         print("=" * 60)
         print(f"Source Configuration: {self.network_data_file}")
         print(f"Output Directory: {self.output_dir}")
         print("=" * 60)
-        
+        #####################################################################################################
         # PHASE 1: Load network configuration
         print("\nPHASE 1: Loading Network Configuration Data")
         print("-" * 45)
@@ -811,7 +844,7 @@ ansible-playbook playbooks/deploy_network.yml
         
         total_devices = sum(len(dept['devices']) for dept in self.departments) + len(self.core_infrastructure)
         print(f"Total devices to configure: {total_devices}")
-        
+        #####################################################################################################
         # PHASE 2: Create directory structure
         print("\nPHASE 2: Creating Ansible Project Structure")
         print("-" * 45)
@@ -822,7 +855,7 @@ ansible-playbook playbooks/deploy_network.yml
         except Exception as e:
             print(f"ERROR: Failed to create directory structure: {e}")
             return False
-        
+        #####################################################################################################
         # PHASE 3: Generate core configuration
         print("\nPHASE 3: Generating Core Ansible Configuration")
         print("-" * 45)
@@ -835,12 +868,12 @@ ansible-playbook playbooks/deploy_network.yml
             print("Generated inventory with exact IP addresses from network_data.yml")
             
             self.generate_group_department()
-            print("Generated group variables for all device types")
+            print("Generated group variables departments for all device hardware")
             
         except Exception as e:
             print(f"ERROR: Failed to generate core configuration: {e}")
             return False
-        
+        #####################################################################################################
         # PHASE 4: Generate network role
         print("\nPHASE 4: Generating Unified Network Configuration Role")
         print("-" * 45)
@@ -856,7 +889,7 @@ ansible-playbook playbooks/deploy_network.yml
         except Exception as e:
             print(f"ERROR: Failed to generate network role: {e}")
             return False
-        
+        #####################################################################################################
         # PHASE 5: Generate playbooks
         print("\nPHASE 5: Generating Deployment Playbooks")
         print("-" * 45)
@@ -868,7 +901,7 @@ ansible-playbook playbooks/deploy_network.yml
         except Exception as e:
             print(f"ERROR: Failed to generate playbooks: {e}")
             return False
-        
+        #####################################################################################################
         # PHASE 6: Generate documentation
         print("\nPHASE 6: Generating Project Documentation")
         print("-" * 45)
@@ -880,7 +913,7 @@ ansible-playbook playbooks/deploy_network.yml
         except Exception as e:
             print(f"ERROR: Failed to generate documentation: {e}")
             return False
-        
+        #####################################################################################################
         # Success summary
         print("\n" + "=" * 60)
         print("NETWORK AUTOMATION GENERATION COMPLETED SUCCESSFULLY")
@@ -895,28 +928,29 @@ ansible-playbook playbooks/deploy_network.yml
         print(f"Output Directory: {self.output_dir}/")
         print("  - ansible.cfg (Ansible configuration)")
         print("  - inventories/hosts.yml (Device inventory)")
-        print("  - group_vars/ (Device group variables)")
+        print("  - departments/ (Device group departments)")
         print("  - roles/network-config/ (Network configuration role)")
-        print("  - site.yml (Complete deployment)")
+        print("  - api.yml (Complete deployment)")
         print("  - README.md (Project documentation)")
         
         print(f"\nDeployment Instructions:")
         print(f"1. Navigate to output directory: cd {self.output_dir}")
-        print(f"2. Deploy complete network: ansible-playbook site.yml")
+        print(f"2. Deploy complete network: ansible-playbook api.yml")
         print(f"3. Deploy network infrastructure only: ansible-playbook playbooks/deploy_network.yml")
         
         return True
-
+    #####################################################################################################
+    #####################################################################################################
     def test_gns3_connection(self):
         """
-        Simple GNS3 connection test without importing diagnostic module
+        Simple GNS3 connection test 
         """
         print("Testing GNS3 server connection...")
         
         try:
             import requests
             
-            # Test basic connection
+            # Test basic connection v3 of gns3
             response = requests.get(f"{self.gns3_server_url}/v3/version", timeout=5)
             
             if response.status_code == 200:
@@ -939,16 +973,18 @@ ansible-playbook playbooks/deploy_network.yml
     # Initialize GNS3 settings
     gns3_server_url = "http://127.0.0.1:3080"
 
-
+#####################################################################################################
+#####################################################################################################
 def main():
     """
-    FIXED Main function with proper menu handling
+   Main function with proper menu interface to interact to user 
     """
-    print("Starting Network Automation Generator - CORRECTED VERSION...")
+    print("Starting Network Automation Generator ")
     print("=" * 60)
     
     # Initialize generator
     generator = NetworkAutomationGenerator()
+    #load network_data
     generator.load_network_data()
     
     # Check if network data loaded successfully
@@ -957,13 +993,14 @@ def main():
         print("Please check your network configuration file")
         exit(1)
     
+    #Load and display the content
     print(f" Loaded {len(generator.departments)} departments")
     print(f" Loaded {len(generator.core_infrastructure)} core infrastructure devices")
     
-    # FIXED MAIN MENU - All choices now handled properly
+    # MAIN MENU Interface - All choices now handled properly
     print("\nWhat would you like to generate?")
-    print("1. Ansible Configuration")
-    print("2. GNS3 Connection Test")
+    print("1. Ansible Configuration Path")
+    print("2. GNS3 Connection Test API")
     print("3. Both Ansible + GNS3 Test")
     print("4. Exit")
     
@@ -974,7 +1011,7 @@ def main():
         exit(0)
     
     success = False
-    
+    #####################################################################################################
     if choice == "1":
         # ANSIBLE GENERATION ONLY
         print("\nGenerating Ansible configuration...")
@@ -982,12 +1019,9 @@ def main():
         
         if success:
             print("\n Ansible automation files generated successfully!")
-            print(" All YAML files use correct dictionary format")
-            print(" All IP addresses taken directly from network_data.yml")
-            print(" No external template files needed")
         else:
             print("\n Ansible generation failed!")
-    
+    #####################################################################################################
     elif choice == "2":
         # GNS3 CONNECTION TEST
         print("\nTesting GNS3 connection...")
@@ -997,7 +1031,7 @@ def main():
             print("\n GNS3 connection test successful!")
         else:
             print("\n GNS3 connection test failed!")
-    
+    #####################################################################################################
     elif choice == "3":
         # BOTH ANSIBLE AND GNS3 TEST
         print("\nGenerating Ansible configuration and testing GNS3...")
@@ -1020,7 +1054,7 @@ def main():
             print(f"\n Partial success:")
             print(f"  Ansible: {' Success' if ansible_success else ' Failed'}")
             print(f"  GNS3: {' Success' if gns3_success else ' Failed'}")
-    
+    #####################################################################################################
     elif choice == "4":
         print("Exiting...")
         exit(0)
@@ -1039,6 +1073,6 @@ def main():
         print("GENERATION COMPLETED WITH ISSUES!")
         print("=" * 60)
 
-
+#####################################################################################################
 if __name__ == "__main__":
     main()

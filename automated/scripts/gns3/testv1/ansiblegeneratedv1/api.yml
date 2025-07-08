@@ -1,5 +1,5 @@
 ---
-# Main Site Deployment Playbook
+# Main API Deployment Playbook
 
 # Configure Network Infrastructure Devices
 - name: Configure Network Infrastructure Devices

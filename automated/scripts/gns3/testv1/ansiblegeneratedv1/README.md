@@ -1,4 +1,4 @@
-# University Network Automation Project
+#Network Automation Project
 
 ## Project Overview
 This project demonstrates automated network deployment using Python and Ansible.
@@ -152,11 +152,11 @@ This project demonstrates automated network deployment using Python and Ansible.
 ### Core Infrastructure
 - `CoreSwitch` (switch): 192.168.1.1
 
-## Usage Instructions
+## Usage Instructions future!
 
 ### Complete Network Deployment
 ```bash
-ansible-playbook site.yml
+ansible-playbook api.yml
 ```
 
 ### Network Infrastructure Only
@@ -167,7 +167,7 @@ ansible-playbook playbooks/deploy_network.yml
 ## Generated Files
 - `ansible.cfg` - Ansible configuration
 - `inventories/hosts.yml` - Device inventory
-- `group_vars/` - Device group variables
+- `departments/` - Device group departments
 - `roles/network-config/` - Network configuration role
-- `site.yml` - Complete deployment playbook
+- `api.yml` - Complete deployment playbook
 - `playbooks/deploy_network.yml` - Network infrastructure only
