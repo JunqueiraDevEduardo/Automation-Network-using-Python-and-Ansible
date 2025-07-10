@@ -1,0 +1,9 @@
+enable
+configure terminal
+hostname PC-1-90
+interface f0/0
+ip address 192.168.90.2 255.255.255.248
+no shutdown
+exit
+ip default-gateway 192.168.90.1
+exit

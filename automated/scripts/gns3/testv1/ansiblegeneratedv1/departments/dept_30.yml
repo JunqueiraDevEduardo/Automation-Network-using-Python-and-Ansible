@@ -1,5 +1,0 @@
-department_name: IT
-gateway: 192.168.30.1
-subnet: 192.168.30.0/28
-vlan_id: 30
-vlan_name: IT

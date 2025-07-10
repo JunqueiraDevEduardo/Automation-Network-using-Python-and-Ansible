@@ -1,0 +1,5 @@
+department_name: Accounts and Finance
+gateway: 192.168.70.1
+subnet: 192.168.70.0/29
+vlan_id: 70
+vlan_name: Accounts-and-Finance

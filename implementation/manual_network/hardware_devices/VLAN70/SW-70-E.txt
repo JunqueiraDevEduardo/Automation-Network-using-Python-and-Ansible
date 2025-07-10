@@ -1,0 +1,11 @@
+enable
+configure terminal
+hostname SW-70-E
+vlan 70
+name Infrastructure
+interface range f0/1 - 4
+switchport mode access
+switchport access vlan 70
+exit
+interface f0/24
+switchport mode trunk

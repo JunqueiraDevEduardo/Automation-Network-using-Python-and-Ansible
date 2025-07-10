@@ -1,5 +1,0 @@
-department_name: Sales and Marketing
-gateway: 192.168.40.1
-subnet: 192.168.40.0/29
-vlan_id: 40
-vlan_name: Sales-and-Marketing

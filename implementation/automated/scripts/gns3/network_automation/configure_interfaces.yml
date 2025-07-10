@@ -1,0 +1,151 @@
+---
+- name: Configure Switch Interfaces
+  hosts: switches
+  gather_facts: no
+  connection: network_cli
+  
+  vars:
+    ansible_network_os: ios
+    ansible_user: admin
+    ansible_password: admin
+    ansible_become: yes
+    ansible_become_method: enable
+    
+  tasks:
+    - name: Configure access ports
+      cisco.ios.ios_l2_interfaces:
+        config:
+          - name: FastEthernet0/1
+            access:
+              vlan: 10
+          - name: FastEthernet0/2
+            access:
+              vlan: 10
+          - name: FastEthernet0/3
+            access:
+              vlan: 10
+          - name: FastEthernet0/4
+            access:
+              vlan: 10
+          - name: FastEthernet0/5
+            access:
+              vlan: 10
+          - name: FastEthernet0/6
+            access:
+              vlan: 10
+          - name: FastEthernet0/7
+            access:
+              vlan: 10
+          - name: FastEthernet0/8
+            access:
+              vlan: 20
+          - name: FastEthernet0/9
+            access:
+              vlan: 20
+          - name: FastEthernet0/10
+            access:
+              vlan: 20
+          - name: FastEthernet0/11
+            access:
+              vlan: 20
+          - name: FastEthernet0/12
+            access:
+              vlan: 20
+          - name: FastEthernet0/13
+            access:
+              vlan: 30
+          - name: FastEthernet0/14
+            access:
+              vlan: 30
+          - name: FastEthernet0/15
+            access:
+              vlan: 30
+          - name: FastEthernet0/16
+            access:
+              vlan: 30
+          - name: FastEthernet0/17
+            access:
+              vlan: 30
+          - name: FastEthernet0/18
+            access:
+              vlan: 30
+          - name: FastEthernet0/19
+            access:
+              vlan: 30
+          - name: FastEthernet0/20
+            access:
+              vlan: 40
+          - name: FastEthernet0/21
+            access:
+              vlan: 40
+          - name: FastEthernet0/22
+            access:
+              vlan: 40
+          - name: FastEthernet0/23
+            access:
+              vlan: 50
+          - name: FastEthernet0/24
+            access:
+              vlan: 50
+          - name: FastEthernet0/25
+            access:
+              vlan: 60
+          - name: FastEthernet0/26
+            access:
+              vlan: 60
+          - name: FastEthernet0/27
+            access:
+              vlan: 70
+          - name: FastEthernet0/28
+            access:
+              vlan: 70
+          - name: FastEthernet0/29
+            access:
+              vlan: 70
+          - name: FastEthernet0/30
+            access:
+              vlan: 80
+          - name: FastEthernet0/31
+            access:
+              vlan: 80
+          - name: FastEthernet0/32
+            access:
+              vlan: 90
+          - name: FastEthernet0/33
+            access:
+              vlan: 90
+          - name: FastEthernet0/34
+            access:
+              vlan: 100
+          - name: FastEthernet0/35
+            access:
+              vlan: 100
+          - name: FastEthernet0/36
+            access:
+              vlan: 100
+          - name: FastEthernet0/37
+            access:
+              vlan: 100
+          - name: FastEthernet0/38
+            access:
+              vlan: 100
+          - name: FastEthernet0/39
+            access:
+              vlan: 100
+          - name: FastEthernet0/40
+            access:
+              vlan: 100
+          - name: FastEthernet0/41
+            access:
+              vlan: 100
+          - name: FastEthernet0/42
+            access:
+              vlan: 100
+          - name: FastEthernet0/43
+            access:
+              vlan: 100
+        state: merged
+        
+    - name: Save configuration
+      cisco.ios.ios_config:
+        save_when: always

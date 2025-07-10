@@ -1,0 +1,5 @@
+department_name: Design
+gateway: 192.168.80.1
+subnet: 192.168.80.0/29
+vlan_id: 80
+vlan_name: Design

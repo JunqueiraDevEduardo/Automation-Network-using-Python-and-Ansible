@@ -1,0 +1,11 @@
+enable
+configure terminal
+hostname SW-20-D
+vlan 20
+name Infrastructure
+interface range f0/1 - 6
+switchport mode access
+switchport access vlan 20
+exit
+interface f0/24
+switchport mode trunk

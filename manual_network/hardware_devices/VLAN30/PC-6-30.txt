@@ -1,9 +1,0 @@
-enable
-configure terminal
-hostname PC-6-30
-interface f0/0
-ip address 192.168.30.7 255.255.255.240
-no shutdown
-exit
-ip default-gateway 192.168.30.1
-exit

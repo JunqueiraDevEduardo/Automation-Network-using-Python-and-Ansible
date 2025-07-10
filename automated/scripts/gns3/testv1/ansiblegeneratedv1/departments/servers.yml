@@ -1,8 +1,0 @@
-ansible_become: 'yes'
-ansible_become_method: sudo
-ansible_connection: ssh
-ansible_user: admin
-dns_servers:
-- 8.8.8.8
-- 8.8.4.4
-domain_name: company.local

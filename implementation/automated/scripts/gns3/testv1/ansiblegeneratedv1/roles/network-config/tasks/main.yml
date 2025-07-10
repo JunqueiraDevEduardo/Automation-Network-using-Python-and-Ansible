@@ -1,0 +1,91 @@
+---
+# Network Configuration Tasks for Switches and Routers Only
+
+# Configure VLANs on switches using real department data
+- name: Configure department VLANs on switches
+  cisco.ios.ios_vlans:
+    config: "{{ department_vlans }}"
+    state: merged
+  when: device_type == "switch"
+  tags: [vlans, switches]
+
+# Configure basic switch settings
+- name: Configure switch base configuration
+  cisco.ios.ios_config:
+    lines:
+      - "hostname {{ inventory_hostname }}"
+      - "service password-encryption"
+      - "ip domain-name {{ domain_name }}"
+      - "enable secret admin"
+      - "username admin privilege 15 secret admin"
+      - "crypto key generate rsa modulus 1024"
+      - "ip ssh version 2"
+    parents: []
+  when: device_type == "switch"
+  tags: [base_config, switches]
+
+# Configure switch management interface with real subnet mask
+- name: Configure switch management interface
+  cisco.ios.ios_config:
+    lines:
+      - "ip address {{ ansible_host }} {{ subnet | ipaddr('netmask') }}"
+      - "no shutdown"
+      - "description Management Interface for {{ department }}"
+    parents: interface vlan1
+  when: device_type == "switch"
+  tags: [mgmt_interface, switches]
+
+# Configure default gateway for switches
+- name: Configure switch default gateway
+  cisco.ios.ios_config:
+    lines:
+      - "ip default-gateway {{ gateway }}"
+    parents: []
+  when: device_type == "switch"
+  tags: [gateway, switches]
+
+# Configure router base settings
+- name: Configure router base configuration
+  cisco.ios.ios_config:
+    lines:
+      - "hostname {{ inventory_hostname }}"
+      - "service password-encryption"
+      - "ip domain-name {{ domain_name }}"
+      - "enable secret admin"
+      - "username admin privilege 15 secret admin"
+      - "ip routing"
+      - "ip cef"
+      - "crypto key generate rsa modulus 1024"
+      - "ip ssh version 2"
+    parents: []
+  when: device_type == "router"
+  tags: [base_config, routers]
+
+# Configure router department interface
+- name: Configure router department LAN interface
+  cisco.ios.ios_config:
+    lines:
+      - "ip address {{ ansible_host }} {{ subnet | ipaddr('netmask') }}"
+      - "no shutdown"
+      - "description {{ department }} Department LAN Gateway"
+    parents: interface GigabitEthernet0/0
+  when: device_type == "router"
+  tags: [interfaces, routers]
+
+# Configure SSH access for all network devices
+- name: Configure VTY lines for SSH access
+  cisco.ios.ios_config:
+    lines:
+      - "login local"
+      - "transport input ssh"
+      - "exec-timeout 30 0"
+    parents: line vty 0 15
+  when: device_type in ["switch", "router"]
+  tags: [ssh_access, network_devices]
+
+# Save configuration on all network devices
+- name: Save running configuration
+  cisco.ios.ios_config:
+    save_when: always
+  when: device_type in ["switch", "router"]
+  tags: [save, network_devices]
