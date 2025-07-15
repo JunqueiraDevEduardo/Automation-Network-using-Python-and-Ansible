@@ -13,19 +13,20 @@ Usage: python3 main.py [command] [options]
 """
 
 # Standard library imports for system operations, file handling, and process management
-import os
 import sys
 import yaml
-import json
 import argparse
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional
 import logging
 
+
 # Import custom modules for network automation functionality
 sys.path.append(str(Path(__file__).parent))
-from automated.scripts.gns3.testv1.generator_ansible import NetworkAutomationGenerator
+from scripts.gns3.testv1.generator_ansible import NetworkAutomationGenerator
+from scripts.gns3.testv2.generatorv2 import SimpleNetworkGenerator
+from scripts.gns3.testv3.generatorv3 import NetworkCreatorAndImplementer
 from scripts.gns3.verify_existing_project import EnhancedGNS3Builder
 from scripts.gns3.diagnostic import GNS3NetworkManager
 

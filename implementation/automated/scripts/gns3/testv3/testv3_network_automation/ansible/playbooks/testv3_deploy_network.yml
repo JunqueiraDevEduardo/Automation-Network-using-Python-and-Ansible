@@ -1,0 +1,15 @@
+---
+# TestV3 Main Deployment Playbook
+- name: Deploy TestV3 Complete Network Configuration
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Run TestV3 VLAN configuration
+      include: testv3_configure_vlans.yml
+    
+    - name: Run TestV3 interface configuration  
+      include: testv3_configure_interfaces.yml
+    
+    - name: Display TestV3 completion message
+      debug:
+        msg: "TestV3 network configuration deployment completed successfully"

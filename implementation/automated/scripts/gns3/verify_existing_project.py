@@ -11,8 +11,6 @@ Purpose: Verify connection to GNS3 server and existing project
 ##################################
 import requests
 import yaml
-import json
-import time
 from typing import Dict, List, Optional, Tuple
 
 class EnhancedGNS3Builder:

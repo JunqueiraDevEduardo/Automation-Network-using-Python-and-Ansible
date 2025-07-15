@@ -1,0 +1,23 @@
+---
+# TestV3 VLAN Configuration Playbook
+- name: Configure TestV3 VLANs
+  hosts: localhost
+  gather_facts: no
+  connection: local
+  tasks:
+    - name: Display TestV3 VLAN configuration
+      debug:
+        msg: "TestV3 would configure the following VLANs:"
+        
+    - name: Show TestV3 VLANs
+      debug:
+        msg: "VLAN {{ item.vlan }} - {{ item.name }}"
+      loop:
+        - vlan: 10
+          name: "TestV3_Department_1"
+        - vlan: 20
+          name: "TestV3_Department_2"
+
+    - name: TestV3 configuration simulation completed
+      debug:
+        msg: "TestV3 VLAN configuration would be applied to switches"

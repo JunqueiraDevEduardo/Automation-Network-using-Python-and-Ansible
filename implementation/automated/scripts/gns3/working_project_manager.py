@@ -9,7 +9,6 @@ This bypasses the authentication issue and gets  automation working.
 ##################################
 import requests
 import yaml
-import json
 from pathlib import Path
 
 def load_network_config():

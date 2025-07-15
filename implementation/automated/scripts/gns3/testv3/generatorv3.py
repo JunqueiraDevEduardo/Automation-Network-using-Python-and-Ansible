@@ -1,569 +1,594 @@
 #!/usr/bin/env python3
 """
-Network Device Management Automation Script
-Implements the flowchart workflow for device discovery, SSH access, and credential management.
+TestV3 - Network Creation and Ansible Implementation
+Eduardo Junqueira IPVC-ESTG ERSC
+
+TestV3 combines three main functions:
+1. Network configuration creation
+2. Ansible automation file generation  
+3. Ansible playbook execution and implementation
 """
 
-import asyncio
-import subprocess
-import paramiko
-import pandas as pd
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
-from datetime import datetime
-import ipaddress
-import logging
-import json
-import os
-from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass, asdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import time
+import os                   # OS utilities for file and path handling
+import yaml                 # YAML file reading and writing
+import json                 # JSON file operations
+import subprocess           # Running system processes (e.g., Ansible commands)
+from pathlib import Path    # For cross-platform filesystem paths
+from typing import Dict, List, Optional    # Type hinting
+import logging              # Logging for information and error tracking
+from datetime import datetime   # For timestamping reports
 
-# Configure logging
+# Configure logging for TestV3 operations
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('network_automation.log'),
-        logging.StreamHandler()
+        logging.FileHandler('testv3_implementation.log'),  # Log to file
+        logging.StreamHandler()                            # Log to console
     ]
 )
 logger = logging.getLogger(__name__)
 
-@dataclass
-class DeviceInfo:
-    """Data class to store device information"""
-    ip_address: str
-    hostname: str = ""
-    device_type: str = ""
-    ssh_status: str = ""
-    credential_status: str = ""
-    error_message: str = ""
-    timestamp: str = ""
-    old_username: str = ""
-    new_username: str = ""
-    ping_status: str = ""
-
-class NetworkDeviceManager:
+class NetworkCreatorAndImplementer:
     """
-    Main class implementing the flowchart workflow:
-    1. Test IP connectivity (ping)
-    2. SSH to reachable devices
-    3. Get hostnames
-    4. Update credentials
-    5. Log to Excel
-    6. Send email report
+    TestV3 Main Class - Complete Network Automation System
+    Handles network creation, Ansible generation, and implementation
     """
     
-    def __init__(self, config_file: str = "network_config.json"):
-        """Initialize the network device manager with configuration"""
-        self.config = self.load_config(config_file)
-        self.results: List[DeviceInfo] = []
-        self.failed_ips: List[str] = []
-        self.successful_devices: List[DeviceInfo] = []
-        
-        # SSH configuration
-        self.ssh_timeout = self.config.get('ssh_timeout', 10)
-        self.max_concurrent = self.config.get('max_concurrent_connections', 5)
-        
-        # Email configuration
-        self.smtp_server = self.config.get('smtp_server', 'smtp.gmail.com')
-        self.smtp_port = self.config.get('smtp_port', 587)
-        self.email_user = self.config.get('email_user', '')
-        self.email_password = self.config.get('email_password', '')
-        self.email_recipients = self.config.get('email_recipients', [])
-        
-        # Credential configuration
-        self.old_credentials = self.config.get('old_credentials', {})
-        self.new_credentials = self.config.get('new_credentials', {})
-        
-        logger.info("Network Device Manager initialized")
-
-    def load_config(self, config_file: str) -> dict:
-        """Load configuration from JSON file"""
-        default_config = {
-            "ip_ranges": ["192.168.1.0/24"],
-            "ssh_timeout": 10,
-            "max_concurrent_connections": 5,
-            "smtp_server": "smtp.gmail.com",
-            "smtp_port": 587,
-            "email_user": "",
-            "email_password": "",
-            "email_recipients": [],
-            "old_credentials": {
-                "username": "admin",
-                "password": "admin"
-            },
-            "new_credentials": {
-                "username": "netadmin",
-                "password": "NewSecureP@ss123"
-            },
-            "device_types": {
-                "cisco": {
-                    "enable_command": "enable",
-                    "config_mode": "configure terminal",
-                    "save_command": "write memory"
-                },
-                "linux": {
-                    "shell_prompt": "$",
-                    "sudo_command": "sudo"
-                }
-            }
+    def __init__(self):
+        """Initialize TestV3 network creator and implementer"""
+        # Core data structure for network information
+        self.network_data = {
+            'departments': [],              # List of each department's network details
+            'core_infrastructure': []       # List of core infrastructure devices (switch/router)
         }
         
-        try:
-            if os.path.exists(config_file):
-                with open(config_file, 'r') as f:
-                    user_config = json.load(f)
-                    default_config.update(user_config)
-                    logger.info(f"Configuration loaded from {config_file}")
-            else:
-                # Create default config file
-                with open(config_file, 'w') as f:
-                    json.dump(default_config, f, indent=2)
-                logger.info(f"Created default configuration file: {config_file}")
-        except Exception as e:
-            logger.error(f"Error loading configuration: {e}")
-            
-        return default_config
-
-    def generate_ip_list(self) -> List[str]:
-        """Generate list of IP addresses from configured ranges"""
-        ip_list = []
+        # Establish directory structure for output and Ansible files
+        self.output_dir = Path("testv3_network_automation")
+        self.ansible_dir = self.output_dir / "ansible"
+        self.results = []      # Placeholder for any run results
         
-        for ip_range in self.config.get('ip_ranges', []):
-            try:
-                network = ipaddress.ip_network(ip_range, strict=False)
-                ip_list.extend([str(ip) for ip in network.hosts()])
-                logger.info(f"Generated {len(list(network.hosts()))} IPs from range {ip_range}")
-            except Exception as e:
-                logger.error(f"Error processing IP range {ip_range}: {e}")
-                
-        return ip_list
-
-    def ping_ip(self, ip: str) -> bool:
-        """Test if IP address is pingable"""
-        try:
-            # Use ping command based on OS
-            if os.name == 'nt':  # Windows
-                result = subprocess.run(['ping', '-n', '1', ip], 
-                                      capture_output=True, text=True, timeout=5)
-            else:  # Unix/Linux
-                result = subprocess.run(['ping', '-c', '1', ip], 
-                                      capture_output=True, text=True, timeout=5)
-            
-            return result.returncode == 0
-        except Exception as e:
-            logger.error(f"Error pinging {ip}: {e}")
-            return False
-
-    def get_device_info_ssh(self, ip: str) -> DeviceInfo:
-        """SSH to device and gather information"""
-        device_info = DeviceInfo(
-            ip_address=ip,
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            ping_status="Success"
-        )
+        # Mapping device types to Ansible inventory groups
+        self.device_types = {
+            'switch': 'switches',
+            'router': 'routers',
+            'pc': 'pcs',
+            'server': 'servers',
+            'printer': 'printers'
+        }
         
-        ssh_client = paramiko.SSHClient()
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        logger.info("TestV3 Network Creator and Implementer initialized")
+
+    def create_network_configuration(self) -> bool:
+        """
+        Step 1: Create the network configuration.
+        Automatically generates network departments, device lists, IPs, VLANs, and core infra.
+        """
+        print("\nTESTV3 STEP 1: CREATING NETWORK CONFIGURATION")
+        print("=" * 50)
         
         try:
-            # Try SSH connection with old credentials
-            ssh_client.connect(
-                ip,
-                username=self.old_credentials['username'],
-                password=self.old_credentials['password'],
-                timeout=self.ssh_timeout
-            )
+            # Get the number of departments to create from the user (default 3)
+            num_depts = self.get_input_number("Number of departments for TestV3", "3")
             
-            device_info.ssh_status = "Connected"
-            logger.info(f"SSH connected to {ip}")
+            # Create department data for each requested department
+            for i in range(num_depts):
+                dept = self.create_department_auto(i + 1)
+                self.network_data['departments'].append(dept)
+                logger.info(f"TestV3 created department: {dept['name']}")
             
-            # Get hostname
-            hostname = self.get_hostname(ssh_client)
-            device_info.hostname = hostname
-            
-            # Detect device type
-            device_type = self.detect_device_type(ssh_client)
-            device_info.device_type = device_type
-            
-            # Update credentials
-            credential_result = self.update_credentials(ssh_client, device_type)
-            device_info.credential_status = credential_result
-            device_info.old_username = self.old_credentials['username']
-            device_info.new_username = self.new_credentials['username']
-            
-            logger.info(f"Device {ip} ({hostname}) processed successfully")
-            
-        except paramiko.AuthenticationException:
-            device_info.ssh_status = "Authentication Failed"
-            device_info.error_message = "Invalid credentials"
-            logger.warning(f"Authentication failed for {ip}")
-            
-        except paramiko.SSHException as e:
-            device_info.ssh_status = "SSH Error"
-            device_info.error_message = str(e)
-            logger.error(f"SSH error for {ip}: {e}")
-            
-        except Exception as e:
-            device_info.ssh_status = "Connection Failed"
-            device_info.error_message = str(e)
-            logger.error(f"Connection failed for {ip}: {e}")
-            
-        finally:
-            ssh_client.close()
-            
-        return device_info
-
-    def get_hostname(self, ssh_client: paramiko.SSHClient) -> str:
-        """Get hostname from connected device"""
-        try:
-            # Try common hostname commands
-            hostname_commands = [
-                'hostname',
-                'show version | include hostname',
-                'cat /etc/hostname',
-                'uname -n'
+            # Define core infrastructure (Switch & Router)
+            self.network_data['core_infrastructure'] = [
+                {'name': 'TestV3_CoreSwitch', 'type': 'switch', 'ip': '192.168.1.1'},
+                {'name': 'TestV3_CoreRouter', 'type': 'router', 'ip': '192.168.1.2'}
             ]
             
-            for cmd in hostname_commands:
-                try:
-                    stdin, stdout, stderr = ssh_client.exec_command(cmd)
-                    output = stdout.read().decode().strip()
-                    if output and not output.startswith('bash:'):
-                        # Extract hostname from output
-                        if 'hostname' in output.lower():
-                            # For Cisco devices
-                            lines = output.split('\n')
-                            for line in lines:
-                                if 'hostname' in line.lower():
-                                    return line.split()[-1]
-                        else:
-                            # For Linux/Unix devices
-                            return output.split('\n')[0].strip()
-                except:
-                    continue
-                    
-        except Exception as e:
-            logger.error(f"Error getting hostname: {e}")
+            # Save the configuration to YAML for future use
+            config_file = "testv3_network_data.yml"
+            with open(config_file, 'w') as f:
+                yaml.dump(self.network_data, f, default_flow_style=False, indent=2)
             
-        return "Unknown"
-
-    def detect_device_type(self, ssh_client: paramiko.SSHClient) -> str:
-        """Detect device type (Cisco, Linux, etc.)"""
-        try:
-            # Try to execute 'show version' for Cisco devices
-            stdin, stdout, stderr = ssh_client.exec_command('show version')
-            output = stdout.read().decode().strip()
-            
-            if 'cisco' in output.lower() or 'ios' in output.lower():
-                return "Cisco"
-            elif 'linux' in output.lower():
-                return "Linux"
-            else:
-                # Try uname for Unix/Linux systems
-                stdin, stdout, stderr = ssh_client.exec_command('uname -a')
-                output = stdout.read().decode().strip()
-                if 'linux' in output.lower():
-                    return "Linux"
-                elif 'unix' in output.lower():
-                    return "Unix"
-                    
-        except Exception as e:
-            logger.error(f"Error detecting device type: {e}")
-            
-        return "Unknown"
-
-    def update_credentials(self, ssh_client: paramiko.SSHClient, device_type: str) -> str:
-        """Update device credentials based on device type"""
-        try:
-            if device_type.lower() == "cisco":
-                return self.update_cisco_credentials(ssh_client)
-            elif device_type.lower() in ["linux", "unix"]:
-                return self.update_linux_credentials(ssh_client)
-            else:
-                return "Unsupported device type"
-                
-        except Exception as e:
-            logger.error(f"Error updating credentials: {e}")
-            return f"Failed: {str(e)}"
-
-    def update_cisco_credentials(self, ssh_client: paramiko.SSHClient) -> str:
-        """Update credentials on Cisco devices"""
-        try:
-            # Enter privileged mode
-            stdin, stdout, stderr = ssh_client.exec_command('enable')
-            stdin.write(self.old_credentials['password'] + '\n')
-            stdin.flush()
-            
-            # Enter configuration mode
-            stdin, stdout, stderr = ssh_client.exec_command('configure terminal')
-            
-            # Add new user
-            new_user_cmd = f"username {self.new_credentials['username']} privilege 15 secret {self.new_credentials['password']}"
-            stdin, stdout, stderr = ssh_client.exec_command(new_user_cmd)
-            
-            # Remove old user (if different)
-            if self.old_credentials['username'] != self.new_credentials['username']:
-                old_user_cmd = f"no username {self.old_credentials['username']}"
-                stdin, stdout, stderr = ssh_client.exec_command(old_user_cmd)
-            
-            # Save configuration
-            stdin, stdout, stderr = ssh_client.exec_command('end')
-            stdin, stdout, stderr = ssh_client.exec_command('write memory')
-            
-            return "Success"
-            
-        except Exception as e:
-            return f"Failed: {str(e)}"
-
-    def update_linux_credentials(self, ssh_client: paramiko.SSHClient) -> str:
-        """Update credentials on Linux/Unix devices"""
-        try:
-            # Add new user
-            add_user_cmd = f"sudo useradd -m -s /bin/bash {self.new_credentials['username']}"
-            stdin, stdout, stderr = ssh_client.exec_command(add_user_cmd)
-            
-            # Set password
-            set_pass_cmd = f"echo '{self.new_credentials['username']}:{self.new_credentials['password']}' | sudo chpasswd"
-            stdin, stdout, stderr = ssh_client.exec_command(set_pass_cmd)
-            
-            # Add to sudo group
-            sudo_cmd = f"sudo usermod -aG sudo {self.new_credentials['username']}"
-            stdin, stdout, stderr = ssh_client.exec_command(sudo_cmd)
-            
-            # Remove old user (if different)
-            if self.old_credentials['username'] != self.new_credentials['username']:
-                del_user_cmd = f"sudo userdel -r {self.old_credentials['username']}"
-                stdin, stdout, stderr = ssh_client.exec_command(del_user_cmd)
-            
-            return "Success"
-            
-        except Exception as e:
-            return f"Failed: {str(e)}"
-
-    def process_devices(self, ip_list: List[str]) -> None:
-        """Process devices following the flowchart workflow"""
-        logger.info(f"Starting to process {len(ip_list)} IP addresses")
-        
-        # Step 1: Test IP connectivity
-        logger.info("Step 1: Testing IP connectivity...")
-        pingable_ips = []
-        
-        with ThreadPoolExecutor(max_workers=self.max_concurrent) as executor:
-            # Submit ping tasks
-            ping_futures = {executor.submit(self.ping_ip, ip): ip for ip in ip_list}
-            
-            for future in as_completed(ping_futures):
-                ip = ping_futures[future]
-                try:
-                    if future.result():
-                        pingable_ips.append(ip)
-                        logger.info(f"✓ {ip} is pingable")
-                    else:
-                        self.failed_ips.append(ip)
-                        logger.info(f"✗ {ip} is not pingable")
-                except Exception as e:
-                    self.failed_ips.append(ip)
-                    logger.error(f"Error pinging {ip}: {e}")
-        
-        logger.info(f"Ping results: {len(pingable_ips)} pingable, {len(self.failed_ips)} failed")
-        
-        # Step 2: SSH to pingable devices
-        logger.info("Step 2: SSH to pingable devices...")
-        
-        with ThreadPoolExecutor(max_workers=self.max_concurrent) as executor:
-            # Submit SSH tasks
-            ssh_futures = {executor.submit(self.get_device_info_ssh, ip): ip for ip in pingable_ips}
-            
-            for future in as_completed(ssh_futures):
-                ip = ssh_futures[future]
-                try:
-                    device_info = future.result()
-                    self.results.append(device_info)
-                    
-                    if device_info.ssh_status == "Connected":
-                        self.successful_devices.append(device_info)
-                        logger.info(f"✓ {ip} processed successfully")
-                    else:
-                        logger.warning(f"✗ {ip} failed: {device_info.error_message}")
-                        
-                except Exception as e:
-                    logger.error(f"Error processing {ip}: {e}")
-                    # Add failed device to results
-                    failed_device = DeviceInfo(
-                        ip_address=ip,
-                        ping_status="Success",
-                        ssh_status="Processing Error",
-                        error_message=str(e),
-                        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    )
-                    self.results.append(failed_device)
-
-        # Add failed ping results to overall results
-        for ip in self.failed_ips:
-            failed_device = DeviceInfo(
-                ip_address=ip,
-                ping_status="Failed",
-                ssh_status="N/A",
-                error_message="Device not pingable",
-                timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            )
-            self.results.append(failed_device)
-
-        logger.info(f"Processing complete: {len(self.successful_devices)} successful, {len(self.results) - len(self.successful_devices)} failed")
-
-    def save_to_excel(self, filename: str = None) -> str:
-        """Save results to Excel file"""
-        if filename is None:
-            filename = f"network_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        
-        try:
-            # Convert results to DataFrame
-            data = [asdict(device) for device in self.results]
-            df = pd.DataFrame(data)
-            
-            # Create Excel writer with multiple sheets
-            with pd.ExcelWriter(filename, engine='openpyxl') as writer:
-                # All results
-                df.to_excel(writer, sheet_name='All Devices', index=False)
-                
-                # Successful devices
-                successful_data = [asdict(device) for device in self.successful_devices]
-                if successful_data:
-                    successful_df = pd.DataFrame(successful_data)
-                    successful_df.to_excel(writer, sheet_name='Successful', index=False)
-                
-                # Failed devices
-                failed_data = [asdict(device) for device in self.results 
-                              if device.ssh_status != "Connected"]
-                if failed_data:
-                    failed_df = pd.DataFrame(failed_data)
-                    failed_df.to_excel(writer, sheet_name='Failed', index=False)
-                
-                # Summary sheet
-                summary_data = {
-                    'Metric': ['Total IPs Processed', 'Pingable', 'Not Pingable', 'SSH Successful', 'SSH Failed', 'Credentials Updated'],
-                    'Count': [
-                        len(self.results),
-                        len([d for d in self.results if d.ping_status == "Success"]),
-                        len([d for d in self.results if d.ping_status == "Failed"]),
-                        len([d for d in self.results if d.ssh_status == "Connected"]),
-                        len([d for d in self.results if d.ssh_status not in ["Connected", "N/A"]]),
-                        len([d for d in self.results if d.credential_status == "Success"])
-                    ]
-                }
-                summary_df = pd.DataFrame(summary_data)
-                summary_df.to_excel(writer, sheet_name='Summary', index=False)
-            
-            logger.info(f"Results saved to {filename}")
-            return filename
-            
-        except Exception as e:
-            logger.error(f"Error saving Excel file: {e}")
-            raise
-
-    def send_email_report(self, excel_filename: str) -> bool:
-        """Send Excel report via email"""
-        try:
-            if not self.email_recipients:
-                logger.warning("No email recipients configured")
-                return False
-            
-            # Create message
-            msg = MIMEMultipart()
-            msg['From'] = self.email_user
-            msg['To'] = ', '.join(self.email_recipients)
-            msg['Subject'] = f"Network Device Audit Report - {datetime.now().strftime('%Y-%m-%d')}"
-            
-            # Email body
-            body = f"""
-Network Device Audit Report
-
-Summary:
-- Total IPs Processed: {len(self.results)}
-- Successful SSH Connections: {len(self.successful_devices)}
-- Failed Connections: {len(self.results) - len(self.successful_devices)}
-- Ping Failures: {len(self.failed_ips)}
-
-Report generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-Please find the detailed Excel report attached.
-            """
-            
-            msg.attach(MIMEText(body, 'plain'))
-            
-            # Attach Excel file
-            with open(excel_filename, 'rb') as attachment:
-                part = MIMEBase('application', 'octet-stream')
-                part.set_payload(attachment.read())
-                encoders.encode_base64(part)
-                part.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename= {os.path.basename(excel_filename)}'
-                )
-                msg.attach(part)
-            
-            # Send email
-            server = smtplib.SMTP(self.smtp_server, self.smtp_port)
-            server.starttls()
-            server.login(self.email_user, self.email_password)
-            server.send_message(msg)
-            server.quit()
-            
-            logger.info(f"Email report sent to {len(self.email_recipients)} recipients")
+            print(f"TestV3 network configuration created: {num_depts} departments")
+            print(f"TestV3 configuration saved to: {config_file}")
             return True
             
         except Exception as e:
-            logger.error(f"Error sending email: {e}")
+            logger.error(f"TestV3 error creating network configuration: {e}")
             return False
 
-    def run(self) -> None:
-        """Main execution method following the flowchart"""
-        logger.info("Starting Network Device Management Automation")
+    def create_department_auto(self, dept_number: int) -> Dict:
+        """
+        Automatically creates a single department configuration.
+        Devices and addressing are generated based on user input and department number.
+        """
+        # Assign department name and VLAN based on index
+        dept_name = f"TestV3_Department_{dept_number}"
+        vlan_id = dept_number * 10
+        subnet_base = f"192.168.{vlan_id}"
         
-        try:
-            # Generate IP list
-            ip_list = self.generate_ip_list()
-            if not ip_list:
-                logger.error("No IP addresses to process")
-                return
-            
-            # Process devices
-            self.process_devices(ip_list)
-            
-            # Save results to Excel
-            excel_filename = self.save_to_excel()
-            
-            # Send email report
-            if self.email_recipients:
-                self.send_email_report(excel_filename)
-            
-            # Print summary
-            self.print_summary()
-            
-        except Exception as e:
-            logger.error(f"Error in main execution: {e}")
-            raise
+        # Prompt user for number of devices per type in this department
+        print(f"\nConfiguring TestV3 {dept_name} (VLAN {vlan_id}):")
+        switches = self.get_input_number("  Switches", "1")
+        routers = self.get_input_number("  Routers", "1")
+        pcs = self.get_input_number("  PCs", "3")
+        servers = self.get_input_number("  Servers", "1")
+        printers = self.get_input_number("  Printers", "1")
+        
+        # Build the department's devices list with generated IPs
+        devices = []
+        ip_counter = 10   # Start at this .x in the subnet
+        
+        # Switches
+        for i in range(switches):
+            devices.append({
+                'name': f"TestV3_SW_{vlan_id}_{i+1}",
+                'type': 'switch',
+                'ip': f"{subnet_base}.{ip_counter}"
+            })
+            ip_counter += 1
+        
+        # Routers
+        for i in range(routers):
+            devices.append({
+                'name': f"TestV3_R_{vlan_id}_{i+1}",
+                'type': 'router',
+                'ip': f"{subnet_base}.{ip_counter}"
+            })
+            ip_counter += 1
+        
+        # PCs
+        for i in range(pcs):
+            devices.append({
+                'name': f"TestV3_PC_{vlan_id}_{i+1}",
+                'type': 'pc',
+                'ip': f"{subnet_base}.{ip_counter}"
+            })
+            ip_counter += 1
+        
+        # Servers
+        for i in range(servers):
+            devices.append({
+                'name': f"TestV3_SRV_{vlan_id}_{i+1}",
+                'type': 'server',
+                'ip': f"{subnet_base}.{ip_counter}"
+            })
+            ip_counter += 1
+        
+        # Printers
+        for i in range(printers):
+            devices.append({
+                'name': f"TestV3_PRT_{vlan_id}_{i+1}",
+                'type': 'printer',
+                'ip': f"{subnet_base}.{ip_counter}"
+            })
+            ip_counter += 1
+        
+        # Return all department info
+        return {
+            'name': dept_name,
+            'vlan': vlan_id,
+            'subnet': f"{subnet_base}.0/24",
+            'gateway': f"{subnet_base}.1",
+            'devices': devices
+        }
 
-    def print_summary(self) -> None:
-        """Print execution summary"""
-        print("\n" + "="*60)
-        print("NETWORK DEVICE MANAGEMENT AUTOMATION - SUMMARY")
-        print("="*60)
-        print(f"Total IPs Processed: {len(self.results)}")
-        print(f"Successful SSH Connections: {len(self.successful_devices)}")
-        print(f"Failed Connections: {len(self.results) - len(self.successful_devices)}")
-        print(f"Ping Failures: {len(self.failed_ips)}")
-        print(f"Credentials Updated: {len([d for d in self.results if d.credential_status == 'Success'])}")
-        print("\nDetailed results saved to Excel file")
-        print("="*60)
+    def generate_ansible_files(self) -> bool:
+        """
+        Step 2: Generate all Ansible files (inventory, playbooks, scripts).
+        Automates the creation of the directory structure and relevant files.
+        """
+        print("\nTESTV3 STEP 2: GENERATING ANSIBLE FILES")
+        print("=" * 50)
+        try:
+            # Ensure all necessary ansible directories exist
+            self.create_ansible_directories()
+            
+            # Generate all the config files and playbooks needed
+            self.generate_ansible_cfg()
+            self.generate_inventory()
+            self.generate_vlan_playbook()
+            self.generate_interface_playbook()
+            self.generate_pc_script()
+            self.generate_main_playbook()
+            
+            print("TestV3 Ansible files generated successfully")
+            return True
+        except Exception as e:
+            logger.error(f"TestV3 error generating Ansible files: {e}")
+            return False
+
+    def create_ansible_directories(self):
+        """Create required directories for all Ansible assets."""
+        directories = [
+            self.output_dir,
+            self.ansible_dir,
+            self.ansible_dir / "inventories",
+            self.ansible_dir / "playbooks",
+            self.ansible_dir / "roles" / "testv3-network-config" / "tasks",
+            self.ansible_dir / "roles" / "testv3-network-config" / "vars",
+            self.ansible_dir / "scripts"
+        ]
+        # Create each directory, including any parent directories
+        for directory in directories:
+            directory.mkdir(parents=True, exist_ok=True)
+
+    def generate_ansible_cfg(self):
+        """Create ansible.cfg file for configuring Ansible behavior."""
+        config_content = """[defaults]
+# TestV3 Ansible Configuration
+inventory = inventories/hosts.yml
+remote_user = admin
+host_key_checking = False
+timeout = 30
+retry_files_enabled = False
+gathering = explicit
+stdout_callback = default
+deprecation_warnings = False
+interpreter_python = auto_silent
+
+[persistent_connection]
+# TestV3 network device timeouts
+connect_timeout = 30
+command_timeout = 30
+"""
+        with open(self.ansible_dir / "ansible.cfg", 'w') as f:
+            f.write(config_content)
+
+    def generate_inventory(self):
+        """Creates the Ansible inventory (hosts.yml) for all devices per group."""
+        inventory = {
+            'all': {
+                'children': {
+                    'switches': {'hosts': {}},
+                    'routers': {'hosts': {}},
+                    'pcs': {'hosts': {}},
+                    'servers': {'hosts': {}},
+                    'printers': {'hosts': {}}
+                }
+            }
+        }
+        # For each department, add devices to the relevant group
+        for dept in self.network_data['departments']:
+            for device in dept['devices']:
+                device_info = {
+                    'ansible_host': device['ip'],
+                    'department': dept['name'],
+                    'vlan_id': dept['vlan'],
+                    'testv3_device': True
+                }
+                # Additional vars for network gear
+                if device['type'] in ['switch', 'router']:
+                    device_info.update({
+                        'ansible_network_os': 'ios',
+                        'ansible_connection': 'network_cli',
+                        'ansible_user': 'admin',
+                        'ansible_password': 'admin'
+                    })
+                else:
+                    device_info.update({
+                        'ansible_connection': 'ssh',
+                        'ansible_user': 'admin'
+                    })
+                group = self.device_types.get(device['type'], 'others')
+                inventory['all']['children'][group]['hosts'][device['name']] = device_info
+        # Save full inventory as YAML
+        with open(self.ansible_dir / "inventories" / "hosts.yml", 'w') as f:
+            yaml.dump(inventory, f, default_flow_style=False, indent=2)
+
+    def generate_vlan_playbook(self):
+        """
+        Generate the playbook for network VLAN configuration.
+        Playbook only simulates the setup (debug output), not live changes.
+        """
+        playbook = """---
+# TestV3 VLAN Configuration Playbook
+- name: Configure TestV3 VLANs
+  hosts: localhost
+  gather_facts: no
+  connection: local
+  tasks:
+    - name: Display TestV3 VLAN configuration
+      debug:
+        msg: "TestV3 would configure the following VLANs:"
+        
+    - name: Show TestV3 VLANs
+      debug:
+        msg: "VLAN {{ item.vlan }} - {{ item.name }}"
+      loop:
+"""
+        # Add each VLAN in this loop
+        for dept in self.network_data['departments']:
+            vlan_name = dept['name'].replace(' ', '-')
+            playbook += f"""        - vlan: {dept['vlan']}
+          name: "{vlan_name}"
+"""
+        playbook += """
+    - name: TestV3 configuration simulation completed
+      debug:
+        msg: "TestV3 VLAN configuration would be applied to switches"
+"""
+        with open(self.ansible_dir / "playbooks" / "testv3_configure_vlans.yml", 'w') as f:
+            f.write(playbook)
+
+    def generate_interface_playbook(self):
+        """
+        Generate playbook for switch interface assignments.
+        Mandates which device is on which switch port and VLAN.
+        """
+        playbook = """---
+# TestV3 Interface Configuration Playbook
+- name: Configure TestV3 Interfaces
+  hosts: localhost
+  gather_facts: no
+  connection: local
+  tasks:
+    - name: Display TestV3 interface configuration
+      debug:
+        msg: "TestV3 would configure the following interfaces:"
+        
+    - name: Show TestV3 interfaces
+      debug:
+        msg: "Interface FastEthernet0/{{ item.port }} - VLAN {{ item.vlan }} - Device {{ item.device }}"
+      loop:
+"""
+        port_num = 1
+        for dept in self.network_data['departments']:
+            for device in dept['devices']:
+                if device['type'] in ['pc', 'server', 'printer']:
+                    playbook += f"""        - port: {port_num}
+          vlan: {dept['vlan']}
+          device: "{device['name']}"
+"""
+                    port_num += 1
+        playbook += """
+    - name: TestV3 interface configuration simulation completed
+      debug:
+        msg: "TestV3 interface configuration would be applied to switches"
+"""
+        with open(self.ansible_dir / "playbooks" / "testv3_configure_interfaces.yml", 'w') as f:
+            f.write(playbook)
+
+    def generate_pc_script(self):
+        """
+        Generate a bash script template (testv3_configure_pcs.sh)
+        for PC/server network interface configuration.
+        """
+        script = """#!/bin/bash
+# TestV3 PC Configuration Script
+echo "Configuring TestV3 PC Network Settings..."
+
+"""
+        for dept in self.network_data['departments']:
+            script += f"""
+# TestV3 {dept['name']} (VLAN {dept['vlan']})
+echo "Configuring TestV3 {dept['name']} devices..."
+"""
+            for device in dept['devices']:
+                if device['type'] in ['pc', 'server']:
+                    script += f"""
+# Configure TestV3 {device['name']}
+echo "  Setting up TestV3 {device['name']}: {device['ip']}"
+# Linux command: sudo ip addr add {device['ip']}/24 dev eth0
+# Linux command: sudo ip route add default via {dept['gateway']}
+"""
+        script += """
+echo "TestV3 PC configuration completed"
+"""
+        with open(self.ansible_dir / "scripts" / "testv3_configure_pcs.sh", 'w') as f:
+            f.write(script)
+        # Set executable permission for script
+        os.chmod(self.ansible_dir / "scripts" / "testv3_configure_pcs.sh", 0o755)
+
+    def generate_main_playbook(self):
+        """Create a master playbook to sequentially apply VLAN and interface playbooks."""
+        playbook = """---
+# TestV3 Main Deployment Playbook
+- name: Deploy TestV3 Complete Network Configuration
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Run TestV3 VLAN configuration
+      include: testv3_configure_vlans.yml
+    
+    - name: Run TestV3 interface configuration  
+      include: testv3_configure_interfaces.yml
+    
+    - name: Display TestV3 completion message
+      debug:
+        msg: "TestV3 network configuration deployment completed successfully"
+"""
+        with open(self.ansible_dir / "playbooks" / "testv3_deploy_network.yml", 'w') as f:
+            f.write(playbook)
+
+    def implement_ansible_configuration(self) -> bool:
+        """
+        Step 3: Run the Ansible configuration (playbook execution).
+        Handles checking for Ansible install, valid inventory, and playbook execution.
+        """
+        print("\nTESTV3 STEP 3: IMPLEMENTING ANSIBLE CONFIGURATION")
+        print("=" * 50)
+        try:
+            # Change current directory to Ansible directory
+            original_dir = os.getcwd()
+            os.chdir(self.ansible_dir)
+            
+            # Check if Ansible is installed on the system
+            if not self.check_ansible_installation():
+                print("Ansible is not installed for TestV3. Please install it first.")
+                os.chdir(original_dir)
+                return False
+            
+            # Validate the Ansible inventory
+            if not self.test_inventory():
+                print("TestV3 inventory test failed - continuing with simulation mode")
+            
+            # Run playbooks (syntax-check and execution)
+            if not self.execute_playbooks():
+                print("TestV3 playbook execution had issues but continuing...")
+            
+            # Restore the original working directory
+            os.chdir(original_dir)
+            print("TestV3 Ansible configuration implementation completed")
+            return True
+        except Exception as e:
+            logger.error(f"TestV3 error implementing Ansible configuration: {e}")
+            return False
+
+    def check_ansible_installation(self) -> bool:
+        """Returns True if Ansible is installed and accessible; otherwise False."""
+        try:
+            result = subprocess.run(['ansible', '--version'], 
+                                  capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                print("Ansible is installed for TestV3")
+                return True
+            else:
+                print("Ansible is not installed for TestV3")
+                return False
+        except Exception as e:
+            print(f"TestV3 error checking Ansible: {e}")
+            return False
+
+    def test_inventory(self) -> bool:
+        """Tests the generated Ansible inventory file for formatting errors."""
+        try:
+            print("Testing TestV3 inventory...")
+            result = subprocess.run(['ansible-inventory', '--list'], 
+                                  capture_output=True, text=True, timeout=30)
+            if result.returncode == 0:
+                print("TestV3 inventory is valid")
+                return True
+            else:
+                print(f"TestV3 inventory error: {result.stderr}")
+                return False
+        except Exception as e:
+            print(f"TestV3 error testing inventory: {e}")
+            return False
+
+    def execute_playbooks(self) -> bool:
+        """
+        Runs the generated playbooks with syntax check and user confirmation.
+        Handles errors but continues with other playbooks if possible.
+        """
+        try:
+            playbooks = [
+                "playbooks/testv3_configure_vlans.yml",
+                "playbooks/testv3_configure_interfaces.yml"
+            ]
+            for playbook in playbooks:
+                print(f"\nExecuting TestV3: {playbook}")
+                # Syntax check the playbook before execution
+                result = subprocess.run([
+                    'ansible-playbook', playbook, '--syntax-check'
+                ], capture_output=True, text=True, timeout=60)
+                if result.returncode == 0:
+                    print(f"TestV3 {playbook} syntax check passed")
+                    # Ask user before executing each playbook
+                    if self.get_user_confirmation(f"Execute TestV3 {playbook}?"):
+                        result = subprocess.run([
+                            'ansible-playbook', playbook,
+                            '--connection=local', '--verbose'
+                        ], capture_output=True, text=True, timeout=300)
+                        if result.returncode == 0:
+                            print(f"TestV3 {playbook} executed successfully")
+                        else:
+                            print(f"TestV3 {playbook} failed")
+                            print(f"Error output: {result.stderr}")
+                            print(f"Standard output: {result.stdout}")
+                            continue
+                else:
+                    print(f"TestV3 {playbook} syntax check failed")
+                    print(f"Error: {result.stderr}")
+                    continue
+            return True
+        except Exception as e:
+            logger.error(f"TestV3 error executing playbooks: {e}")
+            return False
+
+    def generate_report(self):
+        """
+        Generates a summary report of the project, counting device types and generated files.
+        Report is printed and saved as JSON.
+        """
+        print("\nTESTV3 IMPLEMENTATION REPORT")
+        print("=" * 40)
+        device_counts = {}
+        total_devices = 0
+        for dept in self.network_data['departments']:
+            for device in dept['devices']:
+                device_type = device['type']
+                device_counts[device_type] = device_counts.get(device_type, 0) + 1
+                total_devices += 1
+        print(f"TestV3 Departments Created: {len(self.network_data['departments'])}")
+        print(f"TestV3 Total Devices: {total_devices}")
+        print(f"TestV3 Device Breakdown:")
+        for device_type, count in device_counts.items():
+            print(f"  - {device_type.title()}s: {count}")
+        print(f"\nTestV3 Files Generated:")
+        print(f"  - Network Config: testv3_network_data.yml")
+        print(f"  - Ansible Directory: {self.ansible_dir}")
+        print(f"  - Inventory: inventories/hosts.yml")
+        print(f"  - Playbooks: playbooks/")
+        print(f"  - Scripts: scripts/")
+        # Save report as JSON
+        report_data = {
+            'testv3_version': '1.0',
+            'timestamp': datetime.now().isoformat(),
+            'departments': len(self.network_data['departments']),
+            'total_devices': total_devices,
+            'device_counts': device_counts,
+            'status': 'testv3_completed'
+        }
+        with open(self.output_dir / "testv3_implementation_report.json", 'w') as f:
+            json.dump(report_data, f, indent=2)
+        print(f"\nTestV3 report saved to: {self.output_dir}/testv3_implementation_report.json")
+
+    def get_input_number(self, prompt: str, default: str) -> int:
+        """Prompt user for a number with default fallback (for device counts)."""
+        try:
+            value = input(f"{prompt} [{default}]: ").strip()
+            return int(value) if value else int(default)
+        except:
+            return int(default)
+
+    def get_user_confirmation(self, prompt: str) -> bool:
+        """Prompt user for yes/no (y/n) confirmation, default is yes."""
+        response = input(f"{prompt} (y/n) [y]: ").strip().lower()
+        return response in ['y', 'yes', ''] or response == 'y'
+
+    def run(self):
+        """
+        Main orchestrator method for the project.
+        Executes the three TestV3 phases in order, with user confirmation at key steps.
+        """
+        print("=" * 60)
+        print("TESTV3: NETWORK CREATION AND ANSIBLE IMPLEMENTATION")
+        print("=" * 60)
+        try:
+            if not self.create_network_configuration():
+                print("TestV3 failed to create network configuration")
+                return
+            if not self.generate_ansible_files():
+                print("TestV3 failed to generate Ansible files")
+                return
+            if self.get_user_confirmation("Proceed with TestV3 Ansible implementation?"):
+                if not self.implement_ansible_configuration():
+                    print("TestV3 failed to implement Ansible configuration")
+                    return
+            self.generate_report()
+            print("\n" + "=" * 60)
+            print("TESTV3 COMPLETED SUCCESSFULLY")
+            print("=" * 60)
+        except KeyboardInterrupt:
+            print("\nTestV3 operation cancelled by user")
+        except Exception as e:
+            logger.error(f"TestV3 unexpected error: {e}")
+            print(f"TestV3 error: {e}")
+
+def main():
+    """Entry point for TestV3 execution."""
+    creator = NetworkCreatorAndImplementer()
+    creator.run()
 
 if __name__ == "__main__":
-    # Create and run the network device manager
-    manager = NetworkDeviceManager()
-    manager.run()
+    main()

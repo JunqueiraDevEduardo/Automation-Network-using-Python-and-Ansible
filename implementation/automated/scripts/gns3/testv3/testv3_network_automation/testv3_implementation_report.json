@@ -1,0 +1,14 @@
+{
+  "testv3_version": "1.0",
+  "timestamp": "2025-07-15T20:33:31.596487",
+  "departments": 2,
+  "total_devices": 56,
+  "device_counts": {
+    "switch": 6,
+    "router": 3,
+    "pc": 35,
+    "server": 7,
+    "printer": 5
+  },
+  "status": "testv3_completed"
+}

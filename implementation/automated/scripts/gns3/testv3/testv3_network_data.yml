@@ -1,0 +1,186 @@
+core_infrastructure:
+- ip: 192.168.1.1
+  name: TestV3_CoreSwitch
+  type: switch
+- ip: 192.168.1.2
+  name: TestV3_CoreRouter
+  type: router
+departments:
+- devices:
+  - ip: 192.168.10.10
+    name: TestV3_SW_10_1
+    type: switch
+  - ip: 192.168.10.11
+    name: TestV3_SW_10_2
+    type: switch
+  - ip: 192.168.10.12
+    name: TestV3_SW_10_3
+    type: switch
+  - ip: 192.168.10.13
+    name: TestV3_SW_10_4
+    type: switch
+  - ip: 192.168.10.14
+    name: TestV3_R_10_1
+    type: router
+  - ip: 192.168.10.15
+    name: TestV3_R_10_2
+    type: router
+  - ip: 192.168.10.16
+    name: TestV3_PC_10_1
+    type: pc
+  - ip: 192.168.10.17
+    name: TestV3_PC_10_2
+    type: pc
+  - ip: 192.168.10.18
+    name: TestV3_PC_10_3
+    type: pc
+  - ip: 192.168.10.19
+    name: TestV3_PC_10_4
+    type: pc
+  - ip: 192.168.10.20
+    name: TestV3_PC_10_5
+    type: pc
+  - ip: 192.168.10.21
+    name: TestV3_PC_10_6
+    type: pc
+  - ip: 192.168.10.22
+    name: TestV3_SRV_10_1
+    type: server
+  - ip: 192.168.10.23
+    name: TestV3_SRV_10_2
+    type: server
+  - ip: 192.168.10.24
+    name: TestV3_SRV_10_3
+    type: server
+  - ip: 192.168.10.25
+    name: TestV3_PRT_10_1
+    type: printer
+  gateway: 192.168.10.1
+  name: TestV3_Department_1
+  subnet: 192.168.10.0/24
+  vlan: 10
+- devices:
+  - ip: 192.168.20.10
+    name: TestV3_SW_20_1
+    type: switch
+  - ip: 192.168.20.11
+    name: TestV3_SW_20_2
+    type: switch
+  - ip: 192.168.20.12
+    name: TestV3_R_20_1
+    type: router
+  - ip: 192.168.20.13
+    name: TestV3_PC_20_1
+    type: pc
+  - ip: 192.168.20.14
+    name: TestV3_PC_20_2
+    type: pc
+  - ip: 192.168.20.15
+    name: TestV3_PC_20_3
+    type: pc
+  - ip: 192.168.20.16
+    name: TestV3_PC_20_4
+    type: pc
+  - ip: 192.168.20.17
+    name: TestV3_PC_20_5
+    type: pc
+  - ip: 192.168.20.18
+    name: TestV3_PC_20_6
+    type: pc
+  - ip: 192.168.20.19
+    name: TestV3_PC_20_7
+    type: pc
+  - ip: 192.168.20.20
+    name: TestV3_PC_20_8
+    type: pc
+  - ip: 192.168.20.21
+    name: TestV3_PC_20_9
+    type: pc
+  - ip: 192.168.20.22
+    name: TestV3_PC_20_10
+    type: pc
+  - ip: 192.168.20.23
+    name: TestV3_PC_20_11
+    type: pc
+  - ip: 192.168.20.24
+    name: TestV3_PC_20_12
+    type: pc
+  - ip: 192.168.20.25
+    name: TestV3_PC_20_13
+    type: pc
+  - ip: 192.168.20.26
+    name: TestV3_PC_20_14
+    type: pc
+  - ip: 192.168.20.27
+    name: TestV3_PC_20_15
+    type: pc
+  - ip: 192.168.20.28
+    name: TestV3_PC_20_16
+    type: pc
+  - ip: 192.168.20.29
+    name: TestV3_PC_20_17
+    type: pc
+  - ip: 192.168.20.30
+    name: TestV3_PC_20_18
+    type: pc
+  - ip: 192.168.20.31
+    name: TestV3_PC_20_19
+    type: pc
+  - ip: 192.168.20.32
+    name: TestV3_PC_20_20
+    type: pc
+  - ip: 192.168.20.33
+    name: TestV3_PC_20_21
+    type: pc
+  - ip: 192.168.20.34
+    name: TestV3_PC_20_22
+    type: pc
+  - ip: 192.168.20.35
+    name: TestV3_PC_20_23
+    type: pc
+  - ip: 192.168.20.36
+    name: TestV3_PC_20_24
+    type: pc
+  - ip: 192.168.20.37
+    name: TestV3_PC_20_25
+    type: pc
+  - ip: 192.168.20.38
+    name: TestV3_PC_20_26
+    type: pc
+  - ip: 192.168.20.39
+    name: TestV3_PC_20_27
+    type: pc
+  - ip: 192.168.20.40
+    name: TestV3_PC_20_28
+    type: pc
+  - ip: 192.168.20.41
+    name: TestV3_PC_20_29
+    type: pc
+  - ip: 192.168.20.42
+    name: TestV3_SRV_20_1
+    type: server
+  - ip: 192.168.20.43
+    name: TestV3_SRV_20_2
+    type: server
+  - ip: 192.168.20.44
+    name: TestV3_SRV_20_3
+    type: server
+  - ip: 192.168.20.45
+    name: TestV3_SRV_20_4
+    type: server
+  - ip: 192.168.20.46
+    name: TestV3_PRT_20_1
+    type: printer
+  - ip: 192.168.20.47
+    name: TestV3_PRT_20_2
+    type: printer
+  - ip: 192.168.20.48
+    name: TestV3_PRT_20_3
+    type: printer
+  - ip: 192.168.20.49
+    name: TestV3_PRT_20_4
+    type: printer
+  gateway: 192.168.20.1
+  name: TestV3_Department_2
+  subnet: 192.168.20.0/24
+  vlan: 20

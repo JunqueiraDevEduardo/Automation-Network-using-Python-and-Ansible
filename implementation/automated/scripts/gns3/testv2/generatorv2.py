@@ -1,7 +1,7 @@
 """
 Project 2 Eduardo Junqueira IPVC-ESTG ERSC
 Network Automation Generator V2
-simplified network topology generator without limitations generate thr network_data_new.yml
+simplified network topology generator without limitations generate thr network_data_v2_new.yml
 Features:
 - Create, edit, delete departments and devices without restrictions
 - 100% automatic operation with minimal user input
@@ -9,9 +9,10 @@ Features:
 - Simple and fast workflow
 """
 
-import yaml
-import os
-from pathlib import Path
+import yaml #librarie to read files yml that need the python3 -m pip install pyyaml command
+import os #provides functions for interacting with the operating system.
+from pathlib import Path #call path() directly without having the prefix pathlib.
+
 
 class SimpleNetworkGenerator:
     """
@@ -21,7 +22,7 @@ class SimpleNetworkGenerator:
     
     def __init__(self):
         """Initialize the simple network generator"""
-        self.network_data = {
+        self.network_data_v2 = {
             'departments': [],
             'core_infrastructure': []
         }
@@ -145,12 +146,12 @@ class SimpleNetworkGenerator:
 
     def list_departments(self):
         """List all departments"""
-        if not self.network_data['departments']:
+        if not self.network_data_v2['departments']:
             print("No departments found")
             return False
             
         print("\nDepartments:")
-        for i, dept in enumerate(self.network_data['departments'], 1):
+        for i, dept in enumerate(self.network_data_v2['departments'], 1):
             print(f"{i}. {dept['name']} (VLAN {dept['vlan']}, {len(dept['devices'])} devices)")
         return True
 
@@ -161,7 +162,7 @@ class SimpleNetworkGenerator:
             
         try:
             choice = int(self.get_input("Select department number")) - 1
-            dept = self.network_data['departments'][choice]
+            dept = self.network_data_v2['departments'][choice]
         except:
             print("Invalid selection")
             return
@@ -190,11 +191,11 @@ class SimpleNetworkGenerator:
             
         try:
             choice = int(self.get_input("Select department number to delete")) - 1
-            dept = self.network_data['departments'][choice]
+            dept = self.network_data_v2['departments'][choice]
             
             confirm = self.get_input(f"Delete '{dept['name']}'? (y/n)", "n")
             if confirm.lower() == 'y':
-                removed = self.network_data['departments'].pop(choice)
+                removed = self.network_data_v2['departments'].pop(choice)
                 print(f"Department '{removed['name']}' deleted")
             else:
                 print("Deletion cancelled")
@@ -211,14 +212,14 @@ class SimpleNetworkGenerator:
         # Auto-create departments
         for i in range(num_depts):
             dept = self.create_department_auto(i + 1)
-            self.network_data['departments'].append(dept)
+            self.network_data_v2['departments'].append(dept)
             
         # Auto-create core infrastructure
         core_devices = [
             {'name': 'CoreSwitch', 'type': 'switch', 'ip': '192.168.1.1'},
             {'name': 'CoreRouter', 'type': 'router', 'ip': '192.168.1.2'}
         ]
-        self.network_data['core_infrastructure'] = core_devices
+        self.network_data_v2['core_infrastructure'] = core_devices
         
         print(f"\nNetwork created: {num_depts} departments + core infrastructure")
 
@@ -226,11 +227,11 @@ class SimpleNetworkGenerator:
         """Display network summary"""
         self.print_header("NETWORK SUMMARY")
         
-        if not self.network_data['departments']:
+        if not self.network_data_v2['departments']:
             print("No network data")
             return
             
-        for dept in self.network_data['departments']:
+        for dept in self.network_data_v2['departments']:
             print(f"\n{dept['name']} (VLAN {dept['vlan']})")
             print(f"  Subnet: {dept['subnet']}")
             print(f"  Gateway: {dept['gateway']}")
@@ -239,30 +240,30 @@ class SimpleNetworkGenerator:
             for device in dept['devices']:
                 print(f"    {device['name']} ({device['type']}) - {device['ip']}")
                 
-        if self.network_data['core_infrastructure']:
+        if self.network_data_v2['core_infrastructure']:
             print(f"\nCore Infrastructure:")
-            for device in self.network_data['core_infrastructure']:
+            for device in self.network_data_v2['core_infrastructure']:
                 print(f"  {device['name']} ({device['type']}) - {device['ip']}")
 
     def save_network(self):
         """Save network to file"""
-        filename = self.get_input("Filename", "network_data.yml")
+        filename = self.get_input("Filename", "network_data_v2.yml")
         
         try:
             with open(filename, 'w') as f:
-                yaml.dump(self.network_data, f, default_flow_style=False, indent=2)
+                yaml.dump(self.network_data_v2, f, default_flow_style=False, indent=2)
             print(f"Network saved to {filename}")
         except Exception as e:
             print(f"Save error: {e}")
 
     def load_network(self):
         """Load network from file"""
-        filename = self.get_input("Filename to load", "network_data.yml")
+        filename = self.get_input("Filename to load", "network_data_v2.yml")
         
         try:
             if os.path.exists(filename):
                 with open(filename, 'r') as f:
-                    self.network_data = yaml.safe_load(f)
+                    self.network_data_v2 = yaml.safe_load(f)
                 print(f"Network loaded from {filename}")
             else:
                 print("File not found")
@@ -280,7 +281,7 @@ class SimpleNetworkGenerator:
             {'name': 'Finance', 'vlan': 30, 'devices': {'switch': 1, 'router': 1, 'pc': 4, 'server': 1, 'printer': 2}}
         ]
         
-        self.network_data['departments'] = []
+        self.network_data_v2['departments'] = []
         
         for template in templates:
             devices = []
@@ -303,10 +304,10 @@ class SimpleNetworkGenerator:
                 'gateway': f"{subnet_base}.1",
                 'devices': devices
             }
-            self.network_data['departments'].append(dept)
+            self.network_data_v2['departments'].append(dept)
         
         # Add core
-        self.network_data['core_infrastructure'] = [
+        self.network_data_v2['core_infrastructure'] = [
             {'name': 'CoreSwitch', 'type': 'switch', 'ip': '192.168.1.1'},
             {'name': 'CoreRouter', 'type': 'router', 'ip': '192.168.1.2'}
         ]

@@ -1,0 +1,160 @@
+---
+# TestV3 Interface Configuration Playbook
+- name: Configure TestV3 Interfaces
+  hosts: localhost
+  gather_facts: no
+  connection: local
+  tasks:
+    - name: Display TestV3 interface configuration
+      debug:
+        msg: "TestV3 would configure the following interfaces:"
+        
+    - name: Show TestV3 interfaces
+      debug:
+        msg: "Interface FastEthernet0/{{ item.port }} - VLAN {{ item.vlan }} - Device {{ item.device }}"
+      loop:
+        - port: 1
+          vlan: 10
+          device: "TestV3_PC_10_1"
+        - port: 2
+          vlan: 10
+          device: "TestV3_PC_10_2"
+        - port: 3
+          vlan: 10
+          device: "TestV3_PC_10_3"
+        - port: 4
+          vlan: 10
+          device: "TestV3_PC_10_4"
+        - port: 5
+          vlan: 10
+          device: "TestV3_PC_10_5"
+        - port: 6
+          vlan: 10
+          device: "TestV3_PC_10_6"
+        - port: 7
+          vlan: 10
+          device: "TestV3_SRV_10_1"
+        - port: 8
+          vlan: 10
+          device: "TestV3_SRV_10_2"
+        - port: 9
+          vlan: 10
+          device: "TestV3_SRV_10_3"
+        - port: 10
+          vlan: 10
+          device: "TestV3_PRT_10_1"
+        - port: 11
+          vlan: 20
+          device: "TestV3_PC_20_1"
+        - port: 12
+          vlan: 20
+          device: "TestV3_PC_20_2"
+        - port: 13
+          vlan: 20
+          device: "TestV3_PC_20_3"
+        - port: 14
+          vlan: 20
+          device: "TestV3_PC_20_4"
+        - port: 15
+          vlan: 20
+          device: "TestV3_PC_20_5"
+        - port: 16
+          vlan: 20
+          device: "TestV3_PC_20_6"
+        - port: 17
+          vlan: 20
+          device: "TestV3_PC_20_7"
+        - port: 18
+          vlan: 20
+          device: "TestV3_PC_20_8"
+        - port: 19
+          vlan: 20
+          device: "TestV3_PC_20_9"
+        - port: 20
+          vlan: 20
+          device: "TestV3_PC_20_10"
+        - port: 21
+          vlan: 20
+          device: "TestV3_PC_20_11"
+        - port: 22
+          vlan: 20
+          device: "TestV3_PC_20_12"
+        - port: 23
+          vlan: 20
+          device: "TestV3_PC_20_13"
+        - port: 24
+          vlan: 20
+          device: "TestV3_PC_20_14"
+        - port: 25
+          vlan: 20
+          device: "TestV3_PC_20_15"
+        - port: 26
+          vlan: 20
+          device: "TestV3_PC_20_16"
+        - port: 27
+          vlan: 20
+          device: "TestV3_PC_20_17"
+        - port: 28
+          vlan: 20
+          device: "TestV3_PC_20_18"
+        - port: 29
+          vlan: 20
+          device: "TestV3_PC_20_19"
+        - port: 30
+          vlan: 20
+          device: "TestV3_PC_20_20"
+        - port: 31
+          vlan: 20
+          device: "TestV3_PC_20_21"
+        - port: 32
+          vlan: 20
+          device: "TestV3_PC_20_22"
+        - port: 33
+          vlan: 20
+          device: "TestV3_PC_20_23"
+        - port: 34
+          vlan: 20
+          device: "TestV3_PC_20_24"
+        - port: 35
+          vlan: 20
+          device: "TestV3_PC_20_25"
+        - port: 36
+          vlan: 20
+          device: "TestV3_PC_20_26"
+        - port: 37
+          vlan: 20
+          device: "TestV3_PC_20_27"
+        - port: 38
+          vlan: 20
+          device: "TestV3_PC_20_28"
+        - port: 39
+          vlan: 20
+          device: "TestV3_PC_20_29"
+        - port: 40
+          vlan: 20
+          device: "TestV3_SRV_20_1"
+        - port: 41
+          vlan: 20
+          device: "TestV3_SRV_20_2"
+        - port: 42
+          vlan: 20
+          device: "TestV3_SRV_20_3"
+        - port: 43
+          vlan: 20
+          device: "TestV3_SRV_20_4"
+        - port: 44
+          vlan: 20
+          device: "TestV3_PRT_20_1"
+        - port: 45
+          vlan: 20
+          device: "TestV3_PRT_20_2"
+        - port: 46
+          vlan: 20
+          device: "TestV3_PRT_20_3"
+        - port: 47
+          vlan: 20
+          device: "TestV3_PRT_20_4"
+
+    - name: TestV3 interface configuration simulation completed
+      debug:
+        msg: "TestV3 interface configuration would be applied to switches"
